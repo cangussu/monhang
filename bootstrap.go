@@ -11,12 +11,11 @@ var cmdBoot = &Command{
 	Long: `
 Boot fetches and setups the workspace for the component described in the given configuration file.
 `,
-	OnlyInGOPATH: true,
 }
 
 var bootF = cmdBoot.Flag.String("f", "<defaultconfig>", "configuration file")
 
-func findBootDesc() string {
+func getFilename() string {
 	if *bootF != "<defaultconfig>" {
 		return *bootF
 	}
@@ -24,22 +23,16 @@ func findBootDesc() string {
 }
 
 func runBoot(cmd *Command, args []string) {
-	config, err := parseProjectFile(findBootDesc())
+	// Parse the toplevel project file
+	proj, err := parseProjectFile(getFilename())
 	if err != nil {
 		check(err)
 	}
 
-	config.Fetch() // fetch toplevel component
-
-	// Fetch build dependencies
-	for _, dep := range config.Deps.Build {
-		log.Debug("Processing dependency ", dep.Name)
-		if dep.Repoconfig == nil {
-			log.Debug("Adding toplevel repoconfig to dep:", *config.Repoconfig)
-			dep.Repoconfig = config.Repoconfig
-		}
-		dep.Fetch()
-	}
+	// Fetch toplevel component
+	// proj.Fetch()
+	proj.processDeps()
+	proj.Sort()
 }
 
 func init() {

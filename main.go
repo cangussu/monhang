@@ -34,7 +34,7 @@ func setupLog() {
 	backend := logging.NewLogBackend(os.Stderr, "", 0)
 	backendFormatter := logging.NewBackendFormatter(backend, format)
 	backendLeveled := logging.AddModuleLevel(backend)
-	backendLeveled.SetLevel(logging.ERROR, "")
+	backendLeveled.SetLevel(logging.DEBUG, "")
 	logging.SetBackend(backendFormatter)
 }
 
@@ -60,9 +60,6 @@ type Command struct {
 
 	// Flag is a set of flags specific to this command.
 	Flag flag.FlagSet
-
-	// OnlyInGOPATH limits this command to being run only while inside of a GOPATH
-	OnlyInGOPATH bool
 }
 
 func check(e error) {
