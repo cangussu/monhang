@@ -6,6 +6,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/twmb/algoimpl/go/graph"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ type ComponentRef struct {
 	Version    string      `json:"version"`
 	Repo       string      `json:"repo"`
 	Repoconfig *RepoConfig `json:"repoconfig"`
+	node       graph.Node
 }
 
 // Dependency is the configuration block that defines a dependency.
@@ -27,59 +29,88 @@ type Dependency struct {
 	Intall  []ComponentRef `json:"install"`
 }
 
-// Config is the toplevel struct that represents a configuration file
-type Config struct {
-	ComponentRef
-	Deps Dependency
-}
-
 // RepoConfig defines the configuration for a repository
 type RepoConfig struct {
 	Type string `json:"type"`
 	Base string `json:"base"`
 }
 
-// func (config Config) Fetch() {
-// 	repo := "../test/" + config.Repo
-// 	args := []string{"clone", repo, config.Name}
-// 	git(args)
-// }
+// Project is the toplevel struct that represents a configuration file
+type Project struct {
+	ComponentRef
+	Deps   Dependency
+	graph  *graph.Graph
+	sorted []graph.Node
+}
 
-func git(args []string) {
-	log.Noticef("Executing: git %s\n", args)
+var git = func(args []string) {
+	mglog.Noticef("Executing: git %s\n", args)
 	_, err := exec.Command("git", args...).Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			msg := string(ee.Stderr[:])
-			log.Fatal("Error executing: ", msg)
+			mglog.Fatal("Error executing: ", msg)
 		}
 
-		log.Fatal(err)
+		mglog.Fatal(err)
 	}
+}
+
+func resolveRepo(comp ComponentRef) string {
+	var repo string
+	if comp.Repoconfig != nil {
+		repo = comp.Repoconfig.Base + comp.Repo
+	} else {
+		repo = comp.Repo
+	}
+	return repo
 }
 
 // Fetch the specified component
 func (comp ComponentRef) Fetch() {
-	var repo string
-	if comp.Repoconfig != nil {
-		repo += comp.Repoconfig.Base + comp.Repo
-	} else {
-		repo = comp.Repo
-	}
-
+	repo := resolveRepo(comp)
 	args := []string{"clone", repo, comp.Name}
 	git(args)
 }
 
-func parseProjectFile(filename string) (*Config, error) {
+// Project methods
+
+func parseProjectFile(filename string) (*Project, error) {
 	var data []byte
 	data, err := ioutil.ReadFile(filename)
 	if ee, ok := err.(*os.PathError); ok {
-		log.Error("Error: ", ee)
+		mglog.Error("Error: ", ee)
 		return nil, err
 	}
 
-	var config Config
-	err = json.Unmarshal(data, &config)
-	return &config, err
+	var proj Project
+	err = json.Unmarshal(data, &proj)
+	return &proj, nil
+}
+
+func (proj *Project) processDeps() {
+	proj.graph = graph.New(graph.Directed)
+	proj.node = proj.graph.MakeNode()
+	*proj.node.Value = proj
+
+	// Build the dependency graph
+	for _, dep := range proj.Deps.Build {
+		mglog.Debug("Processing build dependency ", dep.Name)
+
+		// Create dependency edge
+		dep.node = proj.graph.MakeNode()
+		*dep.node.Value = dep
+		proj.graph.MakeEdge(proj.node, dep.node)
+
+		if dep.Repoconfig == nil {
+			mglog.Debug("Adding toplevel repoconfig to dep:", *proj.Repoconfig)
+			dep.Repoconfig = proj.Repoconfig
+		}
+	}
+}
+
+// Sort iterates all build dependencies
+func (proj Project) Sort() {
+	mglog.Debug("Sorting project ", proj.Name)
+	proj.sorted = proj.graph.TopologicalSort()
 }

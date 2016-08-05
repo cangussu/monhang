@@ -4,16 +4,13 @@
 
   "repoconfig" : {
     "type": "git",
-    "base": "/base-dir-for-git-repos/"
+    "base": "git@github.com:monhang/"
   },
 
-  "repo": "/top-app",
+  "repo": "monhang.git",
 
   "build" : {
-    "type": "cmake",
-    "options" : {
-      "build_type": "debug"
-    }
+    "type": "shell"
   },
 
   "deps" : {
@@ -21,12 +18,12 @@
       {
         "name": "lib1",
         "version": "v1.0.0",
-        "repo": "/lib1"
+        "repo": "example.git"
       },
       {
         "name": "lib2",
         "version": "v2.0.2",
-        "repo": "/lib2"
+        "repo": "example.git"
       }
     ]
   }
