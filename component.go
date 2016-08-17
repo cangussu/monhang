@@ -43,16 +43,16 @@ type Project struct {
 	sorted []graph.Node
 }
 
-func git(args []string) {
-	log.Noticef("Executing: git %s\n", args)
+var git = func(args []string) {
+	mglog.Noticef("Executing: git %s\n", args)
 	_, err := exec.Command("git", args...).Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			msg := string(ee.Stderr[:])
-			log.Fatal("Error executing: ", msg)
+			mglog.Fatal("Error executing: ", msg)
 		}
 
-		log.Fatal(err)
+		mglog.Fatal(err)
 	}
 }
 
@@ -79,7 +79,7 @@ func parseProjectFile(filename string) (*Project, error) {
 	var data []byte
 	data, err := ioutil.ReadFile(filename)
 	if ee, ok := err.(*os.PathError); ok {
-		log.Error("Error: ", ee)
+		mglog.Error("Error: ", ee)
 		return nil, err
 	}
 
@@ -95,7 +95,7 @@ func (proj *Project) processDeps() {
 
 	// Build the dependency graph
 	for _, dep := range proj.Deps.Build {
-		log.Debug("Processing build dependency ", dep.Name)
+		mglog.Debug("Processing build dependency ", dep.Name)
 
 		// Create dependency edge
 		dep.node = proj.graph.MakeNode()
@@ -103,26 +103,14 @@ func (proj *Project) processDeps() {
 		proj.graph.MakeEdge(proj.node, dep.node)
 
 		if dep.Repoconfig == nil {
-			log.Debug("Adding toplevel repoconfig to dep:", *proj.Repoconfig)
+			mglog.Debug("Adding toplevel repoconfig to dep:", *proj.Repoconfig)
 			dep.Repoconfig = proj.Repoconfig
 		}
 	}
 }
 
-// CompHandler is a callback to process a component handler
-// type CompHandler func(*ComponentRef)
-
 // Sort iterates all build dependencies
 func (proj Project) Sort() {
-	log.Debug("Sorting project ", proj.Name)
+	mglog.Debug("Sorting project ", proj.Name)
 	proj.sorted = proj.graph.TopologicalSort()
 }
-
-// func (proj Project) (handler CompHandler) {
-// 	for _, n := range proj.sorted {
-// 		if cref, ok := (*n.Value).(ComponentRef); ok {
-// 			log.Debug("Processing node :", cref.Name)
-// 			handler(&cref)
-// 		}
-// 	}
-// }
