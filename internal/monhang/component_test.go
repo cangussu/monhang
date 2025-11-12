@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestGitFetch(t *testing.T) {
+func TestGitFetch(_ *testing.T) {
 	// Duck typing git:
 	var givenArgs []string
 	git = func(args []string) {

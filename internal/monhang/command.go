@@ -32,7 +32,7 @@ type Command struct {
 	Flag flag.FlagSet
 }
 
-// Check panics if there's an error
+// Check panics if there's an error.
 func Check(e error) {
 	if e != nil {
 		panic(e)
