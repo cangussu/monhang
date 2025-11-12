@@ -6,6 +6,10 @@ package main
 
 import (
 	"encoding/json"
+	"path/filepath"
+	"strings"
+
+	"github.com/BurntSushi/toml"
 	"github.com/twmb/algoimpl/go/graph"
 	"io/ioutil"
 	"os"
@@ -14,25 +18,25 @@ import (
 
 // ComponentRef is the configuration block that references a component.
 type ComponentRef struct {
-	Name       string      `json:"name"`
-	Version    string      `json:"version"`
-	Repo       string      `json:"repo"`
-	Repoconfig *RepoConfig `json:"repoconfig"`
+	Name       string      `json:"name" toml:"name"`
+	Version    string      `json:"version" toml:"version"`
+	Repo       string      `json:"repo" toml:"repo"`
+	Repoconfig *RepoConfig `json:"repoconfig" toml:"repoconfig"`
 	node       graph.Node
 }
 
 // Dependency is the configuration block that defines a dependency.
 // There are three types of dependencies: build, runtime and intall
 type Dependency struct {
-	Build   []ComponentRef `json:"build"`
-	Runtime []ComponentRef `json:"runtime"`
-	Intall  []ComponentRef `json:"install"`
+	Build   []ComponentRef `json:"build" toml:"build"`
+	Runtime []ComponentRef `json:"runtime" toml:"runtime"`
+	Intall  []ComponentRef `json:"install" toml:"install"`
 }
 
 // RepoConfig defines the configuration for a repository
 type RepoConfig struct {
-	Type string `json:"type"`
-	Base string `json:"base"`
+	Type string `json:"type" toml:"type"`
+	Base string `json:"base" toml:"base"`
 }
 
 // Project is the toplevel struct that represents a configuration file
@@ -84,8 +88,19 @@ func parseProjectFile(filename string) (*Project, error) {
 	}
 
 	var proj Project
-	err = json.Unmarshal(data, &proj)
-	return &proj, nil
+
+	// Detect file format by extension
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	if ext == ".toml" {
+		// Parse TOML format
+		err = toml.Unmarshal(data, &proj)
+	} else {
+		// Default to JSON format for .json or other extensions
+		err = json.Unmarshal(data, &proj)
+	}
+
+	return &proj, err
 }
 
 func (proj *Project) processDeps() {

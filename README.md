@@ -14,8 +14,14 @@ To fetch a component with all its dependencies, just type:
 monhang boot -f monhang.json
 ```
 
+Or using a TOML configuration file:
+
+```sh
+monhang boot -f monhang.toml
+```
+
 This will create a workspace in the current directory with all needed components
-as described by the monhang.json file.
+as described by the configuration file.
 
 You can also bootstrap from a git URL:
 
@@ -28,13 +34,17 @@ workspace.
 
 ## Configuration file
 
-A configuration file describes a component and also its dependencies. A component
-has the following basic information:
+A configuration file describes a component and also its dependencies. Configuration
+files can be written in either **JSON** or **TOML** format. The format is automatically
+detected based on the file extension (`.json` or `.toml`).
+
+A component has the following basic information:
 
 - **name**: the component identification
 - **version**: the version that will be checked out
 - **repository**: the git clone argument
 
+**JSON format:**
 ```json
 {
   "name": "top-app",
@@ -43,11 +53,19 @@ has the following basic information:
 }
 ```
 
+**TOML format:**
+```toml
+name = "top-app"
+version = "1.0.3"
+repo = "git@github.com:cangussu/monhang.git"
+```
+
 ### Dependencies
 
 The dependency object defines three types of dependency: *build*, *runtime* and
 *install* time. The following example shows two dependencies:
 
+**JSON format:**
 ```json
 {
   "deps" : {
@@ -65,4 +83,17 @@ The dependency object defines three types of dependency: *build*, *runtime* and
     ]
   }
 }
+```
+
+**TOML format:**
+```toml
+[[deps.build]]
+name = "lib1"
+version = "v1.0.0"
+repo = "git@github.com:monhang/examples.git"
+
+[[deps.build]]
+name = "lib2"
+version = "v2.0.2"
+repo = "git@github.com:monhang/examples.git"
 ```
