@@ -5,10 +5,6 @@ run:
   # Include test files
   tests: true
 
-  # Which dirs to skip
-  skip-dirs:
-    - vendor
-
 linters:
   enable:
     # Default linters
