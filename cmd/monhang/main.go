@@ -21,8 +21,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/op/go-logging"
 	"os"
+
+	"github.com/cangussu/monhang/internal/monhang"
+	"github.com/op/go-logging"
 )
 
 var mglog = logging.MustGetLogger("monhang")
@@ -36,36 +38,6 @@ func setupLog() {
 	backendLeveled := logging.AddModuleLevel(backend)
 	backendLeveled.SetLevel(logging.DEBUG, "")
 	logging.SetBackend(backendFormatter)
-}
-
-// Command is an implementation of a godep command
-// like godep save or godep go.
-type Command struct {
-	// Run runs the command.
-	// The args are the arguments after the command name.
-	Run func(cmd *Command, args []string)
-
-	// Name of the command
-	Name string
-
-	// Args the command would expect
-	Args string
-
-	// Short is the short description shown in the 'godep help' output.
-	Short string
-
-	// Long is the long message shown in the
-	// 'godep help <this-command>' output.
-	Long string
-
-	// Flag is a set of flags specific to this command.
-	Flag flag.FlagSet
-}
-
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
 }
 
 func version() {
@@ -87,16 +59,16 @@ Use "monhang help [command]" for more information about a command.`)
 	os.Exit(0)
 }
 
-var cmdHelp = &Command{
+var cmdHelp = &monhang.Command{
 	Name: "help",
-	Run: func(cmd *Command, args []string) {
+	Run: func(cmd *monhang.Command, args []string) {
 		// TODO(cangussu): print the help for the command given in args
 		usageExit()
 	},
 }
 
-var commands = []*Command{
-	cmdBoot,
+var commands = []*monhang.Command{
+	monhang.CmdBoot,
 	cmdHelp,
 }
 

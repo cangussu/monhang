@@ -2,9 +2,9 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
-package main
+package monhang
 
-var cmdBuild = &Command{
+var CmdBuild = &Command{
 	Name:  "build",
 	Args:  "[components...]",
 	Short: "builds given components",
@@ -23,5 +23,5 @@ func runBuild(cmd *Command, args []string) {
 }
 
 func init() {
-	cmdBuild.Run = runBuild // break init loop
+	CmdBuild.Run = runBuild // break init loop
 }
