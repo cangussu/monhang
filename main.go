@@ -74,8 +74,7 @@ func version() {
 
 func usageExit() {
 	version()
-	fmt.Println(`
-Usage:
+	fmt.Println(`Usage:
 
 	monhang command [arguments]
 
@@ -84,8 +83,7 @@ The commands are:
 	boot        bootstraps a workspace
 	version     print monhang version
 
-Use "monhang help [command]" for more information about a command.
-`)
+Use "monhang help [command]" for more information about a command.`)
 	os.Exit(0)
 }
 
