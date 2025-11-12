@@ -2,7 +2,7 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
-package main
+package monhang
 
 import (
 	"encoding/json"
@@ -10,11 +10,14 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/op/go-logging"
 	"github.com/twmb/algoimpl/go/graph"
 	"io/ioutil"
 	"os"
 	"os/exec"
 )
+
+var mglog = logging.MustGetLogger("monhang")
 
 // ComponentRef is the configuration block that references a component.
 type ComponentRef struct {
@@ -79,7 +82,8 @@ func (comp ComponentRef) Fetch() {
 
 // Project methods
 
-func parseProjectFile(filename string) (*Project, error) {
+// ParseProjectFile parses a project configuration file (JSON or TOML format)
+func ParseProjectFile(filename string) (*Project, error) {
 	var data []byte
 	data, err := ioutil.ReadFile(filename)
 	if ee, ok := err.(*os.PathError); ok {
@@ -103,7 +107,7 @@ func parseProjectFile(filename string) (*Project, error) {
 	return &proj, err
 }
 
-func (proj *Project) processDeps() {
+func (proj *Project) ProcessDeps() {
 	proj.graph = graph.New(graph.Directed)
 	proj.node = proj.graph.MakeNode()
 	*proj.node.Value = proj

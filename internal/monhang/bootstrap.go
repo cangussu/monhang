@@ -2,9 +2,9 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
-package main
+package monhang
 
-var cmdBoot = &Command{
+var CmdBoot = &Command{
 	Name:  "boot",
 	Args:  "[configfile]",
 	Short: "bootstrap a component and its dependencies",
@@ -13,7 +13,7 @@ Boot fetches and setups the workspace for the component described in the given c
 `,
 }
 
-var bootF = cmdBoot.Flag.String("f", "<defaultconfig>", "configuration file")
+var bootF = CmdBoot.Flag.String("f", "<defaultconfig>", "configuration file")
 
 func getFilename() string {
 	if *bootF != "<defaultconfig>" {
@@ -24,17 +24,17 @@ func getFilename() string {
 
 func runBoot(cmd *Command, args []string) {
 	// Parse the toplevel project file
-	proj, err := parseProjectFile(getFilename())
+	proj, err := ParseProjectFile(getFilename())
 	if err != nil {
-		check(err)
+		Check(err)
 	}
 
 	// Fetch toplevel component
 	// proj.Fetch()
-	proj.processDeps()
+	proj.ProcessDeps()
 	proj.Sort()
 }
 
 func init() {
-	cmdBoot.Run = runBoot // break init loop
+	CmdBoot.Run = runBoot // break init loop
 }

@@ -1,4 +1,4 @@
-package main
+package monhang
 
 import (
 	"testing"
@@ -36,7 +36,7 @@ func TestGitFetch(t *testing.T) {
 }
 
 func TestParseJSONConfig(t *testing.T) {
-	proj, err := parseProjectFile("test/monhang.json")
+	proj, err := ParseProjectFile("../../test/monhang.json")
 	if err != nil {
 		t.Fatalf("Failed to parse JSON config: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestParseJSONConfig(t *testing.T) {
 }
 
 func TestParseTOMLConfig(t *testing.T) {
-	proj, err := parseProjectFile("test/monhang.toml")
+	proj, err := ParseProjectFile("../../test/monhang.toml")
 	if err != nil {
 		t.Fatalf("Failed to parse TOML config: %v", err)
 	}
