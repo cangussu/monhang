@@ -1,4 +1,4 @@
-version: 2
+version: "2"
 
 run:
   # Timeout for analysis
@@ -42,49 +42,40 @@ linters:
     - unparam       # Reports unused function parameters
     - whitespace    # Detection of leading and trailing whitespace
 
-formatters-settings:
-  gofmt:
-    # Simplify code
-    simplify: true
+  settings:
+    errcheck:
+      # Report about not checking of errors in type assertions
+      check-type-assertions: true
 
-  goimports:
-    # Put imports beginning with prefix after 3rd-party packages
-    local-prefixes: github.com/cangussu/monhang
+    govet:
+      # Enable all analyzers
+      enable-all: true
 
-linters-settings:
-  errcheck:
-    # Report about not checking of errors in type assertions
-    check-type-assertions: true
+    gocyclo:
+      # Minimal cyclomatic complexity to report
+      min-complexity: 15
 
-  govet:
-    # Enable all analyzers
-    enable-all: true
+    funlen:
+      # Maximum function length
+      lines: 100
+      statements: 50
 
-  gocyclo:
-    # Minimal cyclomatic complexity to report
-    min-complexity: 15
+    goconst:
+      # Minimal length of string constant
+      min-len: 3
+      # Minimum occurrences to trigger
+      min-occurrences: 3
 
-  funlen:
-    # Maximum function length
-    lines: 100
-    statements: 50
+    misspell:
+      locale: US
 
-  goconst:
-    # Minimal length of string constant
-    min-len: 3
-    # Minimum occurrences to trigger
-    min-occurrences: 3
-
-  misspell:
-    locale: US
-
-  revive:
-    # Enables all rules by default
-    rules:
-      - name: exported
-        arguments:
-          - "checkPrivateReceivers"
-          - "sayRepetitiveInsteadOfStutters"
+    revive:
+      # Enables all rules by default
+      rules:
+        - name: exported
+          arguments:
+            - "checkPrivateReceivers"
+            - "sayRepetitiveInsteadOfStutters"
 
 issues:
   # Maximum issues count per one linter
@@ -93,10 +84,3 @@ issues:
   # Maximum count of issues with the same text
   max-same-issues: 0
 
-  # Exclude some linters from running on tests files
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - funlen
-        - gocyclo
-        - dupl

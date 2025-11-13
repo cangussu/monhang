@@ -21,11 +21,11 @@ var mglog = logging.MustGetLogger("monhang")
 
 // ComponentRef is the configuration block that references a component.
 type ComponentRef struct {
-	Name       string      `json:"name" toml:"name"`
-	Version    string      `json:"version" toml:"version"`
-	Repo       string      `json:"repo" toml:"repo"`
 	Repoconfig *RepoConfig `json:"repoconfig" toml:"repoconfig"`
 	node       graph.Node
+	Name       string `json:"name" toml:"name"`
+	Version    string `json:"version" toml:"version"`
+	Repo       string `json:"repo" toml:"repo"`
 }
 
 // Dependency is the configuration block that defines a dependency.

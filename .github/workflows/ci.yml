@@ -61,9 +61,9 @@ jobs:
         cache: true
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v7
+      uses: golangci/golangci-lint-action@v9
       with:
-        version: v2.0.0
+        version: v2.1
         args: --timeout=5m
 
   # Job 3: Code Formatting
