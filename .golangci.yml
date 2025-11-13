@@ -1,9 +1,16 @@
+version: 2
+
 run:
   # Timeout for analysis
   timeout: 5m
 
   # Include test files
   tests: true
+
+formatters:
+  enable:
+    - gofmt         # Checks whether code was gofmt-ed
+    - goimports     # Check import statements are formatted
 
 linters:
   enable:
@@ -22,6 +29,7 @@ linters:
     - gocyclo       # Computes cyclomatic complexity
     - dupl          # Code clone detection
     - exhaustive    # Check exhaustiveness of enum switch statements
+    - copyloopvar   # Detects places where loop variables are copied
     - funlen        # Tool for detection of long functions
     - gocognit      # Computes cognitive complexity
     - goconst       # Finds repeated strings that could be constants
@@ -33,6 +41,15 @@ linters:
     - unconvert     # Removes unnecessary type conversions
     - unparam       # Reports unused function parameters
     - whitespace    # Detection of leading and trailing whitespace
+
+formatters-settings:
+  gofmt:
+    # Simplify code
+    simplify: true
+
+  goimports:
+    # Put imports beginning with prefix after 3rd-party packages
+    local-prefixes: github.com/cangussu/monhang
 
 linters-settings:
   errcheck:
