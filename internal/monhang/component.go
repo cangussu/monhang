@@ -42,12 +42,24 @@ type RepoConfig struct {
 	Base string `json:"base" toml:"base"`
 }
 
+// Component represents a workspace component with its source and metadata.
+// The source URL encodes both the version and type (schema).
+// Example formats:
+//   - git+https://github.com/user/repo@v1.0.0
+//   - https://example.com/component.tar.gz@1.2.3
+type Component struct {
+	Source      string `json:"source" toml:"source"`
+	Name        string `json:"name" toml:"name"`
+	Description string `json:"description" toml:"description"`
+}
+
 // Project is the toplevel struct that represents a configuration file.
 type Project struct {
 	ComponentRef
-	Deps   Dependency
-	graph  *graph.Graph
-	sorted []graph.Node
+	Deps       Dependency
+	Components []Component `json:"components" toml:"components"`
+	graph      *graph.Graph
+	sorted     []graph.Node
 }
 
 var git = func(args []string) {

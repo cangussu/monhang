@@ -53,6 +53,8 @@ func usageExit() {
 The commands are:
 
 	boot        bootstraps a workspace
+	workspace   manage workspace components (subcommands: sync)
+	ws          alias for workspace command
 	version     print monhang version
 
 Use "monhang help [command]" for more information about a command.`)
@@ -69,6 +71,8 @@ var cmdHelp = &monhang.Command{
 
 var commands = []*monhang.Command{
 	monhang.CmdBoot,
+	monhang.CmdWorkspace,
+	monhang.CmdWs,
 	cmdHelp,
 }
 

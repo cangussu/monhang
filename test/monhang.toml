@@ -18,3 +18,13 @@ repo = "example.git"
 name = "lib2"
 version = "v2.0.2"
 repo = "example.git"
+
+[[components]]
+source = "git+https://github.com/example/component1@v1.0.0"
+name = "component1"
+description = "Example component from GitHub"
+
+[[components]]
+source = "https://github.com/example/component2.git@v2.1.0"
+name = "component2"
+description = "Another example component"
