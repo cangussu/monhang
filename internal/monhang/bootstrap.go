@@ -4,6 +4,7 @@
 
 package monhang
 
+// CmdBoot is the boot command for bootstrapping a workspace.
 var CmdBoot = &Command{
 	Name:  "boot",
 	Args:  "[configfile]",
@@ -22,7 +23,7 @@ func getFilename() string {
 	return "./monhang.json"
 }
 
-func runBoot(cmd *Command, args []string) {
+func runBoot(_ *Command, _ []string) {
 	// Parse the toplevel project file
 	proj, err := ParseProjectFile(getFilename())
 	if err != nil {

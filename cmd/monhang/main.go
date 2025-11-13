@@ -16,6 +16,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+// Package main is the entry point for the monhang command-line tool.
 package main
 
 import (
@@ -27,7 +28,6 @@ import (
 	"github.com/op/go-logging"
 )
 
-var mglog = logging.MustGetLogger("monhang")
 var format = logging.MustStringFormatter(
 	`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
 )
@@ -61,7 +61,7 @@ Use "monhang help [command]" for more information about a command.`)
 
 var cmdHelp = &monhang.Command{
 	Name: "help",
-	Run: func(cmd *monhang.Command, args []string) {
+	Run: func(_ *monhang.Command, _ []string) {
 		// TODO(cangussu): print the help for the command given in args
 		usageExit()
 	},
@@ -87,7 +87,10 @@ func main() {
 
 	for _, cmd := range commands {
 		if cmd.Name == args[0] {
-			cmd.Flag.Parse(args[1:])
+			if err := cmd.Flag.Parse(args[1:]); err != nil {
+				fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
+				os.Exit(1)
+			}
 			cmd.Run(cmd, cmd.Flag.Args())
 		}
 	}

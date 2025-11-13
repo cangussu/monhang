@@ -2,47 +2,47 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
+// Package monhang provides component management functionality.
 package monhang
 
 import (
 	"encoding/json"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/op/go-logging"
 	"github.com/twmb/algoimpl/go/graph"
-	"io/ioutil"
-	"os"
-	"os/exec"
 )
 
 var mglog = logging.MustGetLogger("monhang")
 
 // ComponentRef is the configuration block that references a component.
 type ComponentRef struct {
-	Name       string      `json:"name" toml:"name"`
-	Version    string      `json:"version" toml:"version"`
-	Repo       string      `json:"repo" toml:"repo"`
 	Repoconfig *RepoConfig `json:"repoconfig" toml:"repoconfig"`
 	node       graph.Node
+	Name       string `json:"name" toml:"name"`
+	Version    string `json:"version" toml:"version"`
+	Repo       string `json:"repo" toml:"repo"`
 }
 
 // Dependency is the configuration block that defines a dependency.
-// There are three types of dependencies: build, runtime and intall
+// There are three types of dependencies: build, runtime and install.
 type Dependency struct {
 	Build   []ComponentRef `json:"build" toml:"build"`
 	Runtime []ComponentRef `json:"runtime" toml:"runtime"`
 	Intall  []ComponentRef `json:"install" toml:"install"`
 }
 
-// RepoConfig defines the configuration for a repository
+// RepoConfig defines the configuration for a repository.
 type RepoConfig struct {
 	Type string `json:"type" toml:"type"`
 	Base string `json:"base" toml:"base"`
 }
 
-// Project is the toplevel struct that represents a configuration file
+// Project is the toplevel struct that represents a configuration file.
 type Project struct {
 	ComponentRef
 	Deps   Dependency
@@ -55,7 +55,7 @@ var git = func(args []string) {
 	_, err := exec.Command("git", args...).Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			msg := string(ee.Stderr[:])
+			msg := string(ee.Stderr)
 			mglog.Fatal("Error executing: ", msg)
 		}
 
@@ -73,7 +73,7 @@ func resolveRepo(comp ComponentRef) string {
 	return repo
 }
 
-// Fetch the specified component
+// Fetch the specified component.
 func (comp ComponentRef) Fetch() {
 	repo := resolveRepo(comp)
 	args := []string{"clone", repo, comp.Name}
@@ -82,10 +82,11 @@ func (comp ComponentRef) Fetch() {
 
 // Project methods
 
-// ParseProjectFile parses a project configuration file (JSON or TOML format)
+// ParseProjectFile parses a project configuration file (JSON or TOML format).
 func ParseProjectFile(filename string) (*Project, error) {
 	var data []byte
-	data, err := ioutil.ReadFile(filename)
+	// #nosec G304 -- filename is a config file path provided by the user
+	data, err := os.ReadFile(filename)
 	if ee, ok := err.(*os.PathError); ok {
 		mglog.Error("Error: ", ee)
 		return nil, err
@@ -107,6 +108,7 @@ func ParseProjectFile(filename string) (*Project, error) {
 	return &proj, err
 }
 
+// ProcessDeps builds the dependency graph for the project.
 func (proj *Project) ProcessDeps() {
 	proj.graph = graph.New(graph.Directed)
 	proj.node = proj.graph.MakeNode()
@@ -119,7 +121,9 @@ func (proj *Project) ProcessDeps() {
 		// Create dependency edge
 		dep.node = proj.graph.MakeNode()
 		*dep.node.Value = dep
-		proj.graph.MakeEdge(proj.node, dep.node)
+		if err := proj.graph.MakeEdge(proj.node, dep.node); err != nil {
+			mglog.Error("Failed to create edge: ", err)
+		}
 
 		if dep.Repoconfig == nil {
 			mglog.Debug("Adding toplevel repoconfig to dep:", *proj.Repoconfig)
@@ -128,8 +132,8 @@ func (proj *Project) ProcessDeps() {
 	}
 }
 
-// Sort iterates all build dependencies
-func (proj Project) Sort() {
+// Sort iterates all build dependencies.
+func (proj *Project) Sort() {
 	mglog.Debug("Sorting project ", proj.Name)
 	proj.sorted = proj.graph.TopologicalSort()
 }

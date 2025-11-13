@@ -15,6 +15,9 @@ type Command struct {
 	// The args are the arguments after the command name.
 	Run func(cmd *Command, args []string)
 
+	// Flag is a set of flags specific to this command.
+	Flag flag.FlagSet
+
 	// Name of the command
 	Name string
 
@@ -27,12 +30,9 @@ type Command struct {
 	// Long is the long message shown in the
 	// 'godep help <this-command>' output.
 	Long string
-
-	// Flag is a set of flags specific to this command.
-	Flag flag.FlagSet
 }
 
-// Check panics if there's an error
+// Check panics if there's an error.
 func Check(e error) {
 	if e != nil {
 		panic(e)

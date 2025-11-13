@@ -4,6 +4,7 @@
 
 package monhang
 
+// CmdBuild is the build command for building components.
 var CmdBuild = &Command{
 	Name:  "build",
 	Args:  "[components...]",
@@ -14,7 +15,7 @@ component.
 `,
 }
 
-func runBuild(cmd *Command, args []string) {
+func runBuild(_ *Command, _ []string) {
 	// TODO(tgomes): load the workspace configuration
 	var config Project
 
