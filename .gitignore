@@ -1,5 +1,6 @@
 /monhang
 /bin/
+/dist/
 
 # Test coverage files
 coverage.out

@@ -1,4 +1,12 @@
-.PHONY: all build test lint fmt vet security vuln-check coverage clean help
+.PHONY: all build build-all test lint fmt vet security vuln-check coverage clean help install
+
+# Variables
+BINARY_NAME=monhang
+DIST_DIR=dist
+CMD_PATH=./cmd/monhang
+VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
+LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 
 # Default target
 all: fmt vet lint test build
@@ -7,7 +15,9 @@ all: fmt vet lint test build
 help:
 	@echo "Available targets:"
 	@echo "  all           - Run fmt, vet, lint, test, and build (default)"
-	@echo "  build         - Build the project"
+	@echo "  build         - Build the binary for current platform (outputs to dist/)"
+	@echo "  build-all     - Build binaries for all platforms (Linux, macOS, Windows)"
+	@echo "  install       - Install the binary to GOPATH/bin"
 	@echo "  test          - Run all tests"
 	@echo "  test-verbose  - Run tests with verbose output"
 	@echo "  coverage      - Run tests with coverage report"
@@ -21,10 +31,34 @@ help:
 	@echo "  deps          - Download and verify dependencies"
 	@echo "  ci            - Run all CI checks locally"
 
-# Build the project
+# Build the project for current platform
 build:
-	@echo "Building..."
-	go build -v ./...
+	@echo "Building $(BINARY_NAME) for current platform..."
+	@mkdir -p $(DIST_DIR)
+	go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME) $(CMD_PATH)
+	@echo "✓ Binary built: $(DIST_DIR)/$(BINARY_NAME)"
+
+# Build for all platforms
+build-all:
+	@echo "Building $(BINARY_NAME) for all platforms..."
+	@mkdir -p $(DIST_DIR)
+	@echo "Building for Linux (amd64)..."
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 $(CMD_PATH)
+	@echo "Building for Linux (arm64)..."
+	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 $(CMD_PATH)
+	@echo "Building for macOS (amd64)..."
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 $(CMD_PATH)
+	@echo "Building for macOS (arm64)..."
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 $(CMD_PATH)
+	@echo "Building for Windows (amd64)..."
+	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-windows-amd64.exe $(CMD_PATH)
+	@echo "✓ All binaries built in $(DIST_DIR)/"
+
+# Install binary to GOPATH/bin
+install:
+	@echo "Installing $(BINARY_NAME)..."
+	go install $(LDFLAGS) $(CMD_PATH)
+	@echo "✓ Installed to $(shell go env GOPATH)/bin/$(BINARY_NAME)"
 
 # Run tests
 test:
@@ -105,7 +139,9 @@ deps:
 clean:
 	@echo "Cleaning..."
 	go clean
+	rm -rf $(DIST_DIR)
 	rm -f coverage.out coverage.html
+	@echo "✓ Cleaned build artifacts"
 
 # Run all CI checks locally
 ci: deps fmt-check vet lint test build
