@@ -182,7 +182,22 @@ monhang/
 
 ### Before Committing
 
-Run the full CI suite locally:
+**REQUIRED: All code changes MUST pass `make` validation before committing.**
+
+Run the full validation suite locally:
+
+```bash
+make
+```
+
+This will:
+- Format code with `gofmt`
+- Run `go vet` for static analysis
+- Run `golangci-lint` with 30+ linters
+- Run all tests
+- Build the binary
+
+For full CI validation (includes additional checks):
 
 ```bash
 make ci
@@ -194,11 +209,17 @@ This ensures your changes will pass CI before pushing.
 
 1. Create a feature branch
 2. Make your changes to the code
-3. Format the code: `make fmt`
-4. Run all validation checks: `make all`
-5. If everything passes, run CI checks: `make ci`
+3. **Run `make` to validate changes** (REQUIRED)
+4. Fix any linting or test failures
+5. Run CI checks: `make ci`
 6. Commit with a descriptive message
 7. Push your changes
+
+**Note**: The build will fail if:
+- Code is not properly formatted (`gofmt`)
+- Linting issues exist (complexity, style, security, etc.)
+- Tests fail
+- Build errors occur
 
 ---
 

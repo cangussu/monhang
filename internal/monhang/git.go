@@ -55,6 +55,9 @@ var (
 
 // GitResult holds the result of a git operation in a repo.
 type GitResult struct {
+	StartTime  time.Time
+	EndTime    time.Time
+	Error      error
 	Name       string
 	Path       string
 	Operation  string
@@ -62,10 +65,7 @@ type GitResult struct {
 	CommitHash string
 	Status     string
 	Output     string
-	Error      error
 	Running    bool
-	StartTime  time.Time
-	EndTime    time.Time
 }
 
 // GitExecutor manages git operations across repositories.
@@ -614,9 +614,7 @@ func getRepos(proj *Project) []ComponentRef {
 }
 
 // runGitOperation is a helper to run git operations across repos.
-func runGitOperation(repos []ComponentRef, executor *GitExecutor, operation string,
-	parallel bool, opFunc func(context.Context, ComponentRef, string)) {
-
+func runGitOperation(repos []ComponentRef, parallel bool, opFunc func(context.Context, ComponentRef, string)) {
 	ctx := context.Background()
 
 	if parallel {
@@ -636,6 +634,91 @@ func runGitOperation(repos []ComponentRef, executor *GitExecutor, operation stri
 			opFunc(ctx, repo, path)
 		}
 	}
+}
+
+// executeGitSubcommand runs a git subcommand either interactively or non-interactively.
+func executeGitSubcommand(repos []ComponentRef, executor *GitExecutor, operation string, execFunc func()) {
+	if *gitInteractive {
+		if err := runGitInteractive(repos, executor, operation, execFunc); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		execFunc()
+		printGitTable(repos, executor.GetResults(), operation)
+	}
+}
+
+// handleGitStatus handles the git status subcommand.
+func handleGitStatus(repos []ComponentRef, executor *GitExecutor) {
+	operation := "status"
+	execFunc := func() {
+		runGitOperation(repos, *gitParallel,
+			func(ctx context.Context, repo ComponentRef, path string) {
+				executor.ExecuteStatus(ctx, repo.Name, path)
+			})
+	}
+	executeGitSubcommand(repos, executor, operation, execFunc)
+}
+
+// handleGitPull handles the git pull subcommand.
+func handleGitPull(repos []ComponentRef, executor *GitExecutor) {
+	operation := "pull"
+	execFunc := func() {
+		runGitOperation(repos, *gitParallel,
+			func(ctx context.Context, repo ComponentRef, path string) {
+				executor.ExecutePull(ctx, repo.Name, path)
+			})
+	}
+	executeGitSubcommand(repos, executor, operation, execFunc)
+}
+
+// handleGitFetch handles the git fetch subcommand.
+func handleGitFetch(repos []ComponentRef, executor *GitExecutor) {
+	operation := "fetch"
+	execFunc := func() {
+		runGitOperation(repos, *gitParallel,
+			func(ctx context.Context, repo ComponentRef, path string) {
+				executor.ExecuteFetch(ctx, repo.Name, path)
+			})
+	}
+	executeGitSubcommand(repos, executor, operation, execFunc)
+}
+
+// handleGitCheckout handles the git checkout subcommand.
+func handleGitCheckout(repos []ComponentRef, executor *GitExecutor, subArgs []string) {
+	if len(subArgs) == 0 {
+		fmt.Println("Error: branch name required")
+		fmt.Println("Usage: monhang git checkout <branch>")
+		os.Exit(1)
+	}
+	branch := subArgs[0]
+	operation := fmt.Sprintf("checkout %s", branch)
+	execFunc := func() {
+		runGitOperation(repos, *gitParallel,
+			func(ctx context.Context, repo ComponentRef, path string) {
+				executor.ExecuteCheckout(ctx, repo.Name, path, branch)
+			})
+	}
+	executeGitSubcommand(repos, executor, operation, execFunc)
+}
+
+// handleGitBranch handles the git branch subcommand.
+func handleGitBranch(repos []ComponentRef, executor *GitExecutor, subArgs []string) {
+	if len(subArgs) == 0 {
+		fmt.Println("Error: branch name required")
+		fmt.Println("Usage: monhang git branch <branch>")
+		os.Exit(1)
+	}
+	branch := subArgs[0]
+	operation := fmt.Sprintf("branch %s", branch)
+	execFunc := func() {
+		runGitOperation(repos, *gitParallel,
+			func(ctx context.Context, repo ComponentRef, path string) {
+				executor.ExecuteBranch(ctx, repo.Name, path, branch)
+			})
+	}
+	executeGitSubcommand(repos, executor, operation, execFunc)
 }
 
 func runGit(_ *Command, args []string) {
@@ -669,114 +752,15 @@ func runGit(_ *Command, args []string) {
 	// Execute based on subcommand
 	switch subcommand {
 	case "status":
-		operation := "status"
-		execFunc := func() {
-			runGitOperation(repos, executor, operation, *gitParallel,
-				func(ctx context.Context, repo ComponentRef, path string) {
-					executor.ExecuteStatus(ctx, repo.Name, path)
-				})
-		}
-
-		if *gitInteractive {
-			if err := runGitInteractive(repos, executor, operation, execFunc); err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-		} else {
-			execFunc()
-			printGitTable(repos, executor.GetResults(), operation)
-		}
-
+		handleGitStatus(repos, executor)
 	case "pull":
-		operation := "pull"
-		execFunc := func() {
-			runGitOperation(repos, executor, operation, *gitParallel,
-				func(ctx context.Context, repo ComponentRef, path string) {
-					executor.ExecutePull(ctx, repo.Name, path)
-				})
-		}
-
-		if *gitInteractive {
-			if err := runGitInteractive(repos, executor, operation, execFunc); err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-		} else {
-			execFunc()
-			printGitTable(repos, executor.GetResults(), operation)
-		}
-
+		handleGitPull(repos, executor)
 	case "fetch":
-		operation := "fetch"
-		execFunc := func() {
-			runGitOperation(repos, executor, operation, *gitParallel,
-				func(ctx context.Context, repo ComponentRef, path string) {
-					executor.ExecuteFetch(ctx, repo.Name, path)
-				})
-		}
-
-		if *gitInteractive {
-			if err := runGitInteractive(repos, executor, operation, execFunc); err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-		} else {
-			execFunc()
-			printGitTable(repos, executor.GetResults(), operation)
-		}
-
+		handleGitFetch(repos, executor)
 	case "checkout":
-		if len(subArgs) == 0 {
-			fmt.Println("Error: branch name required")
-			fmt.Println("Usage: monhang git checkout <branch>")
-			os.Exit(1)
-		}
-		branch := subArgs[0]
-		operation := fmt.Sprintf("checkout %s", branch)
-
-		execFunc := func() {
-			runGitOperation(repos, executor, operation, *gitParallel,
-				func(ctx context.Context, repo ComponentRef, path string) {
-					executor.ExecuteCheckout(ctx, repo.Name, path, branch)
-				})
-		}
-
-		if *gitInteractive {
-			if err := runGitInteractive(repos, executor, operation, execFunc); err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-		} else {
-			execFunc()
-			printGitTable(repos, executor.GetResults(), operation)
-		}
-
+		handleGitCheckout(repos, executor, subArgs)
 	case "branch":
-		if len(subArgs) == 0 {
-			fmt.Println("Error: branch name required")
-			fmt.Println("Usage: monhang git branch <branch>")
-			os.Exit(1)
-		}
-		branch := subArgs[0]
-		operation := fmt.Sprintf("branch %s", branch)
-
-		execFunc := func() {
-			runGitOperation(repos, executor, operation, *gitParallel,
-				func(ctx context.Context, repo ComponentRef, path string) {
-					executor.ExecuteBranch(ctx, repo.Name, path, branch)
-				})
-		}
-
-		if *gitInteractive {
-			if err := runGitInteractive(repos, executor, operation, execFunc); err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-		} else {
-			execFunc()
-			printGitTable(repos, executor.GetResults(), operation)
-		}
-
+		handleGitBranch(repos, executor, subArgs)
 	default:
 		fmt.Printf("Error: Unknown subcommand '%s'\n", subcommand)
 		fmt.Println("Available subcommands: status, pull, fetch, checkout, branch")
