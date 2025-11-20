@@ -118,16 +118,35 @@ func (proj *Project) ProcessDeps() {
 	for _, dep := range proj.Deps.Build {
 		mglog.Debug("Processing build dependency ", dep.Name)
 
+		// Set repoconfig if not specified
+		if dep.Repoconfig == nil {
+			mglog.Debug("Adding toplevel repoconfig to dep:", *proj.Repoconfig)
+			dep.Repoconfig = proj.Repoconfig
+		}
+
 		// Create dependency edge
 		dep.node = proj.graph.MakeNode()
 		*dep.node.Value = dep
 		if err := proj.graph.MakeEdge(proj.node, dep.node); err != nil {
 			mglog.Error("Failed to create edge: ", err)
 		}
+	}
 
+	// Process runtime dependencies
+	for _, dep := range proj.Deps.Runtime {
+		mglog.Debug("Processing runtime dependency ", dep.Name)
+
+		// Set repoconfig if not specified
 		if dep.Repoconfig == nil {
 			mglog.Debug("Adding toplevel repoconfig to dep:", *proj.Repoconfig)
 			dep.Repoconfig = proj.Repoconfig
+		}
+
+		// Create dependency edge
+		dep.node = proj.graph.MakeNode()
+		*dep.node.Value = dep
+		if err := proj.graph.MakeEdge(proj.node, dep.node); err != nil {
+			mglog.Error("Failed to create edge: ", err)
 		}
 	}
 }

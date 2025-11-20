@@ -30,10 +30,25 @@ func runBoot(_ *Command, _ []string) {
 		Check(err)
 	}
 
-	// Fetch toplevel component
-	// proj.Fetch()
+	// Process and sort dependencies
 	proj.ProcessDeps()
 	proj.Sort()
+
+	// Fetch all dependencies
+	mglog.Info("Fetching dependencies...")
+	for _, node := range proj.sorted {
+		if node.Value == nil {
+			continue
+		}
+		comp, ok := (*node.Value).(ComponentRef)
+		if !ok {
+			mglog.Warning("Skipping non-ComponentRef node")
+			continue
+		}
+		mglog.Infof("Fetching %s...", comp.Name)
+		comp.Fetch()
+	}
+	mglog.Info("All dependencies fetched successfully")
 }
 
 func init() {

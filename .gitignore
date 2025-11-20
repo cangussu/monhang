@@ -1,6 +1,11 @@
 /monhang
 /bin/
+/dist/
 
 # Test coverage files
 coverage.out
 coverage.html
+
+# Test workspace directories
+test-workspace/
+test-workspace-integration/

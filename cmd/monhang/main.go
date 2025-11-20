@@ -53,6 +53,7 @@ func usageExit() {
 The commands are:
 
 	boot        bootstraps a workspace
+	exec        run arbitrary commands inside each repo
 	version     print monhang version
 
 Use "monhang help [command]" for more information about a command.`)
@@ -69,6 +70,7 @@ var cmdHelp = &monhang.Command{
 
 var commands = []*monhang.Command{
 	monhang.CmdBoot,
+	monhang.CmdExec,
 	cmdHelp,
 }
 
