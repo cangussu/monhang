@@ -1,0 +1,30 @@
+{
+  "name": "top-app",
+  "version": "1.0.3",
+
+  "repoconfig" : {
+    "type": "git",
+    "base": "git@github.com:monhang/"
+  },
+
+  "repo": "monhang.git",
+
+  "build" : {
+    "type": "shell"
+  },
+
+  "deps" : {
+    "build": [
+      {
+        "name": "lib1",
+        "version": "v1.0.0",
+        "repo": "example.git"
+      },
+      {
+        "name": "lib2",
+        "version": "v2.0.2",
+        "repo": "example.git"
+      }
+    ]
+  }
+}
