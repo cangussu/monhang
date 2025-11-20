@@ -56,6 +56,7 @@ The commands are:
 	boot        bootstraps a workspace
 	exec        run arbitrary commands inside each repo
 	git         run git operations across all repos
+	workspace   manage workspace components (alias: ws)
 	version     print monhang version
 
 Use "monhang help [command]" for more information about a command.`)
@@ -74,6 +75,8 @@ var commands = []*monhang.Command{
 	monhang.CmdBoot,
 	monhang.CmdExec,
 	monhang.CmdGit,
+	monhang.CmdWorkspace,
+	monhang.CmdWs,
 	cmdHelp,
 }
 

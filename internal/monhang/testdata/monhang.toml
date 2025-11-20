@@ -6,9 +6,6 @@ repo = "monhang.git"
 type = "git"
 base = "git@github.com:monhang/"
 
-[build]
-type = "shell"
-
 [[deps.build]]
 name = "lib1"
 version = "v1.0.0"
