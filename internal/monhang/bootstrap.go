@@ -4,6 +4,10 @@
 
 package monhang
 
+import (
+	"github.com/cangussu/monhang/internal/logging"
+)
+
 // CmdBoot is the boot command for bootstrapping a workspace.
 var CmdBoot = &Command{
 	Name:  "boot",
@@ -24,31 +28,38 @@ func getFilename() string {
 }
 
 func runBoot(_ *Command, _ []string) {
+	filename := getFilename()
+	logging.GetLogger("bootstrap").Info().Str("config", filename).Msg("Starting bootstrap process")
+
 	// Parse the toplevel project file
-	proj, err := ParseProjectFile(getFilename())
+	proj, err := ParseProjectFile(filename)
 	if err != nil {
 		Check(err)
 	}
+
+	logging.GetLogger("bootstrap").Info().Str("project", proj.Name).Str("version", proj.Version).Msg("Project loaded")
 
 	// Process and sort dependencies
 	proj.ProcessDeps()
 	proj.Sort()
 
 	// Fetch all dependencies
-	mglog.Info("Fetching dependencies...")
+	logging.GetLogger("bootstrap").Info().Msg("Fetching dependencies...")
+	fetchedCount := 0
 	for _, node := range proj.sorted {
 		if node.Value == nil {
 			continue
 		}
 		comp, ok := (*node.Value).(ComponentRef)
 		if !ok {
-			mglog.Warning("Skipping non-ComponentRef node")
+			logging.GetLogger("bootstrap").Warn().Msg("Skipping non-ComponentRef node")
 			continue
 		}
-		mglog.Infof("Fetching %s...", comp.Name)
+		logging.GetLogger("bootstrap").Info().Str("component", comp.Name).Str("version", comp.Version).Msg("Fetching component")
 		comp.Fetch()
+		fetchedCount++
 	}
-	mglog.Info("All dependencies fetched successfully")
+	logging.GetLogger("bootstrap").Info().Int("count", fetchedCount).Msg("All dependencies fetched successfully")
 }
 
 func init() {

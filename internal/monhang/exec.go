@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cangussu/monhang/internal/logging"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -79,6 +80,12 @@ func NewRepoExecutor(liveOutput bool) *RepoExecutor {
 
 // ExecuteCommand runs a command in a repository directory.
 func (re *RepoExecutor) ExecuteCommand(ctx context.Context, name, path, command string) {
+	logging.GetLogger("exec").Debug().
+		Str("repo", name).
+		Str("path", path).
+		Str("command", command).
+		Msg("Starting command execution")
+
 	result := &RepoResult{
 		Name:      name,
 		Path:      path,
@@ -94,6 +101,7 @@ func (re *RepoExecutor) ExecuteCommand(ctx context.Context, name, path, command 
 	// Execute command
 	cmdArgs := strings.Fields(command)
 	if len(cmdArgs) == 0 {
+		logging.GetLogger("exec").Error().Str("repo", name).Msg("Empty command provided")
 		result.Error = fmt.Errorf("empty command")
 		result.Running = false
 		result.EndTime = time.Now()
@@ -140,12 +148,25 @@ func (re *RepoExecutor) ExecuteCommand(ctx context.Context, name, path, command 
 	result.Running = false
 	result.EndTime = time.Now()
 
+	duration := result.EndTime.Sub(result.StartTime)
+
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			result.ExitCode = exitErr.ExitCode()
 		} else {
 			result.ExitCode = -1
 		}
+		logging.GetLogger("exec").Error().
+			Str("repo", name).
+			Int("exit_code", result.ExitCode).
+			Dur("duration", duration).
+			Err(err).
+			Msg("Command execution failed")
+	} else {
+		logging.GetLogger("exec").Debug().
+			Str("repo", name).
+			Dur("duration", duration).
+			Msg("Command execution completed successfully")
 	}
 }
 
@@ -417,21 +438,23 @@ func runNonInteractiveMode(repos []ComponentRef, executor *RepoExecutor, command
 	ctx := context.Background()
 
 	if parallel {
+		logging.GetLogger("exec").Info().Int("repo_count", len(repos)).Msg("Executing commands in parallel")
 		var wg sync.WaitGroup
 		for _, repo := range repos {
 			wg.Add(1)
 			go func(r ComponentRef) {
 				defer wg.Done()
 				path := filepath.Join(".", r.Name)
-				mglog.Infof("Executing in %s: %s", r.Name, command)
+				logging.GetLogger("exec").Info().Str("repo", r.Name).Str("command", command).Msg("Executing command")
 				executor.ExecuteCommand(ctx, r.Name, path, command)
 			}(repo)
 		}
 		wg.Wait()
 	} else {
+		logging.GetLogger("exec").Info().Int("repo_count", len(repos)).Msg("Executing commands sequentially")
 		for _, repo := range repos {
 			path := filepath.Join(".", repo.Name)
-			mglog.Infof("Executing in %s: %s", repo.Name, command)
+			logging.GetLogger("exec").Info().Str("repo", repo.Name).Str("command", command).Msg("Executing command")
 			executor.ExecuteCommand(ctx, repo.Name, path, command)
 		}
 	}
@@ -485,6 +508,11 @@ func runExec(_ *Command, args []string) {
 	}
 
 	command := strings.Join(args, " ")
+	logging.GetLogger("exec").Info().
+		Str("command", command).
+		Bool("parallel", *execParallel).
+		Bool("interactive", *execInteractive).
+		Msg("Starting exec command")
 
 	// Parse the configuration file
 	proj, err := ParseProjectFile(*execF)
@@ -500,15 +528,20 @@ func runExec(_ *Command, args []string) {
 	repos = append(repos, proj.Deps.Intall...)
 
 	if len(repos) == 0 {
+		logging.GetLogger("exec").Warn().Msg("No repositories found in configuration")
 		fmt.Println("No repositories found in configuration")
 		return
 	}
+
+	logging.GetLogger("exec").Debug().Int("repo_count", len(repos)).Msg("Repositories loaded")
 
 	executor := NewRepoExecutor(*execLive && !*execInteractive)
 
 	// Interactive mode with bubbletea
 	if *execInteractive {
+		logging.GetLogger("exec").Debug().Msg("Running in interactive mode")
 		if err := runInteractiveMode(repos, executor, command, *execParallel); err != nil {
+			logging.GetLogger("exec").Error().Err(err).Msg("Interactive mode failed")
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -520,6 +553,12 @@ func runExec(_ *Command, args []string) {
 
 	// Print results
 	failCount := printResults(repos, executor.GetResults())
+
+	logging.GetLogger("exec").Info().
+		Int("total", len(repos)).
+		Int("failed", failCount).
+		Int("succeeded", len(repos)-failCount).
+		Msg("Execution summary")
 
 	if failCount > 0 {
 		os.Exit(1)

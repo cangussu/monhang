@@ -99,6 +99,87 @@ All git subcommands support the following options:
 
 **Note:** Git operations only affect repositories that have already been cloned locally (via `monhang boot`).
 
+## Logging and Debug Mode
+
+Monhang uses [zerolog](https://github.com/rs/zerolog) for structured logging. By default, monhang runs in **quiet mode** (only showing errors) to keep output clean. You can enable debug mode to see detailed logging information, which is helpful for troubleshooting and understanding what monhang is doing.
+
+### Enabling Debug Mode
+
+There are two ways to enable debug mode:
+
+#### 1. Environment Variable
+
+Set the `MONHANG_DEBUG` environment variable to `true`:
+
+```sh
+export MONHANG_DEBUG=true
+monhang boot -f monhang.json
+```
+
+Or run it inline:
+
+```sh
+MONHANG_DEBUG=true monhang boot -f monhang.json
+```
+
+#### 2. Command-Line Flag
+
+Use the `--debug` flag:
+
+```sh
+monhang --debug boot -f monhang.json
+monhang --debug git status
+monhang --debug exec -- make build
+```
+
+**Note:** The `--debug` flag must come **before** the subcommand (e.g., `boot`, `git`, `exec`).
+
+### What Debug Mode Shows
+
+When debug mode is enabled, you'll see detailed information about:
+
+- Configuration file parsing
+- Dependency graph processing and sorting
+- Git command execution (commands, arguments, output)
+- Repository operations and timing
+- Command execution details (start, completion, duration)
+- Error context and stack traces
+
+### Example Output
+
+Normal mode (quiet - no log output, only command results):
+```
+# monhang boot runs silently unless there's an error
+```
+
+Debug mode (verbose - shows all internal operations):
+```
+2:04:05PM DBG Debug mode enabled
+2:04:05PM INF Starting bootstrap process config=./monhang.json component=component
+2:04:05PM DBG Parsing project file extension=.json filename=./monhang.json component=component
+2:04:05PM INF Project loaded project=top-app version=1.0.3 component=component
+2:04:05PM DBG Processing project dependencies project=top-app component=component
+2:04:05PM DBG Processing dependency dependency=lib1 type=build component=component
+2:04:05PM DBG Adding toplevel repoconfig to dependency base=git@github.com:monhang/ dependency=lib1 component=component
+2:04:05PM DBG Finished processing dependencies project=top-app total_deps=2 component=component
+2:04:05PM DBG Sorting project dependencies project=top-app component=component
+2:04:05PM DBG Dependencies sorted project=top-app sorted_count=3 component=component
+2:04:05PM INF Fetching dependencies... component=component
+2:04:05PM INF Fetching component component=lib1 version=v1.0.0 component=component
+2:04:05PM INF Executing git command args=["clone" "git@github.com:monhang/lib1.git" "lib1"] component=component
+```
+
+### Log Format
+
+When debug mode is enabled, logs are displayed in a human-readable console format with:
+- **Timestamp**: Time of the log entry (HH:MM:SS format)
+- **Level**: Log level (DBG, INF, WRN, ERR, FAT)
+- **Message**: Descriptive message
+- **Fields**: Structured contextual data (component, repo, duration, etc.)
+- **Color coding**: Different colors for different log levels (in supported terminals)
+
+By default (quiet mode), only errors and fatal messages are shown.
+
 ## Configuration file
 
 A configuration file describes a component and also its dependencies. Configuration

@@ -23,21 +23,22 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/cangussu/monhang/internal/logging"
 	"github.com/cangussu/monhang/internal/monhang"
-	"github.com/op/go-logging"
 )
 
-var format = logging.MustStringFormatter(
-	`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
+var (
+	debugFlag = flag.Bool("debug", false, "Enable debug logging")
 )
 
 func setupLog() {
-	backend := logging.NewLogBackend(os.Stderr, "", 0)
-	backendFormatter := logging.NewBackendFormatter(backend, format)
-	backendLeveled := logging.AddModuleLevel(backend)
-	backendLeveled.SetLevel(logging.DEBUG, "")
-	logging.SetBackend(backendFormatter)
+	// Check for debug mode from environment variable or CLI flag
+	debug := *debugFlag || strings.ToLower(os.Getenv("MONHANG_DEBUG")) == "true"
+
+	// Initialize zerolog
+	logging.Initialize(debug, os.Stderr)
 }
 
 func version() {
@@ -76,13 +77,13 @@ var commands = []*monhang.Command{
 	cmdHelp,
 }
 
-func init() {
-	setupLog()
-}
-
 func main() {
 	flag.Usage = usageExit
 	flag.Parse()
+
+	// Setup logging after parsing flags
+	setupLog()
+
 	args := flag.Args()
 	if len(args) < 1 {
 		fmt.Println("You must tell monhang what to do!")

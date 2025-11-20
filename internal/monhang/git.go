@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cangussu/monhang/internal/logging"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -83,6 +84,11 @@ func NewGitExecutor() *GitExecutor {
 
 // executeGitCommand runs a git command in a repo directory and captures output.
 func executeGitCommand(ctx context.Context, dir string, args ...string) (string, error) {
+	logging.GetLogger("git").Debug().
+		Str("dir", dir).
+		Strs("args", args).
+		Msg("Executing git command")
+
 	// #nosec G204 -- git commands are constructed by the application
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
@@ -92,7 +98,18 @@ func executeGitCommand(ctx context.Context, dir string, args ...string) (string,
 	cmd.Stderr = &out
 
 	err := cmd.Run()
-	return strings.TrimSpace(out.String()), err
+	output := strings.TrimSpace(out.String())
+
+	if err != nil {
+		logging.GetLogger("git").Error().
+			Err(err).
+			Str("dir", dir).
+			Strs("args", args).
+			Str("output", output).
+			Msg("Git command failed")
+	}
+
+	return output, err
 }
 
 // getRepoInfo gets current branch and commit hash for a repo.
@@ -114,6 +131,8 @@ func getRepoStatus(ctx context.Context, dir string) string {
 
 // ExecuteStatus runs git status on a repository.
 func (ge *GitExecutor) ExecuteStatus(ctx context.Context, name, path string) {
+	logging.GetLogger("git").Debug().Str("repo", name).Str("operation", "status").Msg("Starting git status")
+
 	result := &GitResult{
 		Name:      name,
 		Path:      path,
@@ -141,6 +160,13 @@ func (ge *GitExecutor) ExecuteStatus(ctx context.Context, name, path string) {
 	result.Error = err
 	result.Running = false
 	result.EndTime = time.Now()
+
+	duration := result.EndTime.Sub(result.StartTime)
+	if err != nil {
+		logging.GetLogger("git").Error().Err(err).Str("repo", name).Dur("duration", duration).Msg("Git status failed")
+	} else {
+		logging.GetLogger("git").Debug().Str("repo", name).Str("branch", branch).Str("status", status).Dur("duration", duration).Msg("Git status completed")
+	}
 }
 
 // ExecutePull runs git pull on a repository.
@@ -732,6 +758,13 @@ func runGit(_ *Command, args []string) {
 	subcommand := args[0]
 	subArgs := args[1:]
 
+	logging.GetLogger("git").Info().
+		Str("subcommand", subcommand).
+		Strs("args", subArgs).
+		Bool("interactive", *gitInteractive).
+		Bool("parallel", *gitParallel).
+		Msg("Starting git command")
+
 	// Parse configuration
 	proj, err := ParseProjectFile(*gitF)
 	if err != nil {
@@ -742,10 +775,13 @@ func runGit(_ *Command, args []string) {
 	repos := getRepos(proj)
 
 	if len(repos) == 0 {
+		logging.GetLogger("git").Warn().Msg("No repositories found")
 		fmt.Println("No repositories found (or none have been cloned yet)")
 		fmt.Println("Run 'monhang boot' first to clone repositories")
 		return
 	}
+
+	logging.GetLogger("git").Debug().Int("repo_count", len(repos)).Msg("Repositories loaded")
 
 	executor := NewGitExecutor()
 
@@ -762,10 +798,13 @@ func runGit(_ *Command, args []string) {
 	case "branch":
 		handleGitBranch(repos, executor, subArgs)
 	default:
+		logging.GetLogger("git").Error().Str("subcommand", subcommand).Msg("Unknown git subcommand")
 		fmt.Printf("Error: Unknown subcommand '%s'\n", subcommand)
 		fmt.Println("Available subcommands: status, pull, fetch, checkout, branch")
 		os.Exit(1)
 	}
+
+	logging.GetLogger("git").Info().Str("subcommand", subcommand).Msg("Git command completed")
 }
 
 func init() {
