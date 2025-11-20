@@ -26,14 +26,17 @@ func init() {
 		Caller().
 		Logger()
 	log.Logger = Logger
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	// Default: only show errors and fatal messages
+	zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 }
 
 // Initialize sets up the global logger with the specified configuration.
 func Initialize(debug bool, output io.Writer) {
 	// Set the global log level
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	// Default: only show errors (quiet mode)
+	zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 	if debug {
+		// Debug mode: show everything
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 

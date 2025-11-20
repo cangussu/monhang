@@ -101,7 +101,7 @@ All git subcommands support the following options:
 
 ## Logging and Debug Mode
 
-Monhang uses [zerolog](https://github.com/rs/zerolog) for structured logging. By default, the log level is set to `INFO`, which provides essential information about operations. You can enable debug mode to see detailed logging information, which is helpful for troubleshooting and understanding what monhang is doing.
+Monhang uses [zerolog](https://github.com/rs/zerolog) for structured logging. By default, monhang runs in **quiet mode** (only showing errors) to keep output clean. You can enable debug mode to see detailed logging information, which is helpful for troubleshooting and understanding what monhang is doing.
 
 ### Enabling Debug Mode
 
@@ -147,14 +147,12 @@ When debug mode is enabled, you'll see detailed information about:
 
 ### Example Output
 
-Normal mode (INFO level):
+Normal mode (quiet - no log output, only command results):
 ```
-2:04:05PM INF Starting bootstrap process config=./monhang.json component=component
-2:04:05PM INF Project loaded project=top-app version=1.0.3 component=component
-2:04:05PM INF Fetching dependencies... component=component
+# monhang boot runs silently unless there's an error
 ```
 
-Debug mode:
+Debug mode (verbose - shows all internal operations):
 ```
 2:04:05PM DBG Debug mode enabled
 2:04:05PM INF Starting bootstrap process config=./monhang.json component=component
@@ -173,12 +171,14 @@ Debug mode:
 
 ### Log Format
 
-Logs are displayed in a human-readable console format with:
+When debug mode is enabled, logs are displayed in a human-readable console format with:
 - **Timestamp**: Time of the log entry (HH:MM:SS format)
 - **Level**: Log level (DBG, INF, WRN, ERR, FAT)
 - **Message**: Descriptive message
 - **Fields**: Structured contextual data (component, repo, duration, etc.)
 - **Color coding**: Different colors for different log levels (in supported terminals)
+
+By default (quiet mode), only errors and fatal messages are shown.
 
 ## Configuration file
 
