@@ -782,11 +782,10 @@ func runGit(_ *Command, args []string) {
 		if isGitRepository(".") {
 			logging.GetLogger("git").Info().Msg("No config file found, but current directory is a git repository")
 			// Create a minimal project with just the current directory
-			cwd, _ := os.Getwd()
-			dirName := filepath.Base(cwd)
+			// Use "." as the name so getRepos() will find it in the current directory
 			proj = &Project{
 				ComponentRef: ComponentRef{
-					Name: dirName,
+					Name: ".",
 				},
 			}
 		} else {
