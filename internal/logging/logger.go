@@ -12,6 +12,23 @@ import (
 // Logger holds the global logger instance.
 var Logger zerolog.Logger
 
+func init() {
+	// Initialize with a default logger to stderr
+	// This ensures logging works even before Initialize() is called
+	consoleWriter := zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: time.RFC3339,
+		NoColor:    false,
+	}
+	Logger = zerolog.New(consoleWriter).
+		With().
+		Timestamp().
+		Caller().
+		Logger()
+	log.Logger = Logger
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+}
+
 // Initialize sets up the global logger with the specified configuration.
 func Initialize(debug bool, output io.Writer) {
 	// Set the global log level
@@ -48,8 +65,9 @@ func Initialize(debug bool, output io.Writer) {
 }
 
 // GetLogger returns a logger with a specific component name.
-func GetLogger(component string) zerolog.Logger {
-	return Logger.With().Str("component", component).Logger()
+func GetLogger(component string) *zerolog.Logger {
+	logger := Logger.With().Str("component", component).Logger()
+	return &logger
 }
 
 // IsDebugEnabled returns true if debug logging is enabled.
