@@ -1,4 +1,4 @@
-.PHONY: all build build-all test lint fmt vet security vuln-check coverage clean help install
+.PHONY: all build build-all test lint fmt vet security vuln-check coverage clean help install smoke-test integration-test test-setup test-cleanup
 
 # Variables
 BINARY_NAME=monhang
@@ -14,22 +14,26 @@ all: fmt vet lint test build
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  all           - Run fmt, vet, lint, test, and build (default)"
-	@echo "  build         - Build the binary for current platform (outputs to dist/)"
-	@echo "  build-all     - Build binaries for all platforms (Linux, macOS, Windows)"
-	@echo "  install       - Install the binary to GOPATH/bin"
-	@echo "  test          - Run all tests"
-	@echo "  test-verbose  - Run tests with verbose output"
-	@echo "  coverage      - Run tests with coverage report"
-	@echo "  lint          - Run golangci-lint"
-	@echo "  fmt           - Format code with gofmt"
-	@echo "  fmt-check     - Check if code is formatted (CI mode)"
-	@echo "  vet           - Run go vet"
-	@echo "  security      - Run gosec security scanner"
-	@echo "  vuln-check    - Check for vulnerabilities in dependencies"
-	@echo "  clean         - Remove build artifacts"
-	@echo "  deps          - Download and verify dependencies"
-	@echo "  ci            - Run all CI checks locally"
+	@echo "  all              - Run fmt, vet, lint, test, and build (default)"
+	@echo "  build            - Build the binary for current platform (outputs to dist/)"
+	@echo "  build-all        - Build binaries for all platforms (Linux, macOS, Windows)"
+	@echo "  install          - Install the binary to GOPATH/bin"
+	@echo "  test             - Run all tests"
+	@echo "  test-verbose     - Run tests with verbose output"
+	@echo "  coverage         - Run tests with coverage report"
+	@echo "  smoke-test       - Run smoke tests (builds and tests monhang end-to-end)"
+	@echo "  integration-test - Run integration tests"
+	@echo "  test-setup       - Setup test environment (git repos)"
+	@echo "  test-cleanup     - Cleanup test environment"
+	@echo "  lint             - Run golangci-lint"
+	@echo "  fmt              - Format code with gofmt"
+	@echo "  fmt-check        - Check if code is formatted (CI mode)"
+	@echo "  vet              - Run go vet"
+	@echo "  security         - Run gosec security scanner"
+	@echo "  vuln-check       - Check for vulnerabilities in dependencies"
+	@echo "  clean            - Remove build artifacts"
+	@echo "  deps             - Download and verify dependencies"
+	@echo "  ci               - Run all CI checks locally"
 
 # Build the project for current platform
 build:
@@ -142,6 +146,27 @@ clean:
 	rm -rf $(DIST_DIR)
 	rm -f coverage.out coverage.html
 	@echo "✓ Cleaned build artifacts"
+
+# Setup test environment
+test-setup:
+	@echo "Setting up test environment..."
+	@bash scripts/setup-test-repos.sh test-workspace
+
+# Cleanup test environment
+test-cleanup:
+	@echo "Cleaning up test environment..."
+	@rm -rf test-workspace test-workspace-integration
+	@echo "✓ Test environment cleaned"
+
+# Run smoke tests
+smoke-test: build
+	@echo "Running smoke tests..."
+	@bash scripts/smoke-test.sh
+
+# Run integration tests
+integration-test: build
+	@echo "Running integration tests..."
+	@bash scripts/integration-test.sh all
 
 # Run all CI checks locally
 ci: deps fmt-check vet lint test build
