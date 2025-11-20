@@ -9,10 +9,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Logger holds the global logger instance
+// Logger holds the global logger instance.
 var Logger zerolog.Logger
 
-// Initialize sets up the global logger with the specified configuration
+// Initialize sets up the global logger with the specified configuration.
 func Initialize(debug bool, output io.Writer) {
 	// Set the global log level
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
@@ -47,12 +47,12 @@ func Initialize(debug bool, output io.Writer) {
 	}
 }
 
-// GetLogger returns a logger with a specific component name
+// GetLogger returns a logger with a specific component name.
 func GetLogger(component string) zerolog.Logger {
 	return Logger.With().Str("component", component).Logger()
 }
 
-// IsDebugEnabled returns true if debug logging is enabled
+// IsDebugEnabled returns true if debug logging is enabled.
 func IsDebugEnabled() bool {
 	return zerolog.GlobalLevel() <= zerolog.DebugLevel
 }
