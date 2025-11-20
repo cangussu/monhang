@@ -24,31 +24,38 @@ func getFilename() string {
 }
 
 func runBoot(_ *Command, _ []string) {
+	filename := getFilename()
+	log.Info().Str("config", filename).Msg("Starting bootstrap process")
+
 	// Parse the toplevel project file
-	proj, err := ParseProjectFile(getFilename())
+	proj, err := ParseProjectFile(filename)
 	if err != nil {
 		Check(err)
 	}
+
+	log.Info().Str("project", proj.Name).Str("version", proj.Version).Msg("Project loaded")
 
 	// Process and sort dependencies
 	proj.ProcessDeps()
 	proj.Sort()
 
 	// Fetch all dependencies
-	mglog.Info("Fetching dependencies...")
+	log.Info().Msg("Fetching dependencies...")
+	fetchedCount := 0
 	for _, node := range proj.sorted {
 		if node.Value == nil {
 			continue
 		}
 		comp, ok := (*node.Value).(ComponentRef)
 		if !ok {
-			mglog.Warning("Skipping non-ComponentRef node")
+			log.Warn().Msg("Skipping non-ComponentRef node")
 			continue
 		}
-		mglog.Infof("Fetching %s...", comp.Name)
+		log.Info().Str("component", comp.Name).Str("version", comp.Version).Msg("Fetching component")
 		comp.Fetch()
+		fetchedCount++
 	}
-	mglog.Info("All dependencies fetched successfully")
+	log.Info().Int("count", fetchedCount).Msg("All dependencies fetched successfully")
 }
 
 func init() {

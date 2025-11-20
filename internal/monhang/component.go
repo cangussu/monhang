@@ -13,11 +13,16 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/op/go-logging"
+	"github.com/cangussu/monhang/internal/logging"
+	"github.com/rs/zerolog"
 	"github.com/twmb/algoimpl/go/graph"
 )
 
-var mglog = logging.MustGetLogger("monhang")
+var log zerolog.Logger
+
+func init() {
+	log = logging.GetLogger("component")
+}
 
 // ComponentRef is the configuration block that references a component.
 type ComponentRef struct {
@@ -51,15 +56,15 @@ type Project struct {
 }
 
 var git = func(args []string) {
-	mglog.Noticef("Executing: git %s\n", args)
+	log.Info().Strs("args", args).Msg("Executing git command")
 	_, err := exec.Command("git", args...).Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			msg := string(ee.Stderr)
-			mglog.Fatal("Error executing: ", msg)
+			log.Fatal().Str("stderr", msg).Msg("Error executing git command")
 		}
 
-		mglog.Fatal(err)
+		log.Fatal().Err(err).Msg("Error executing git command")
 	}
 }
 
@@ -88,7 +93,7 @@ func ParseProjectFile(filename string) (*Project, error) {
 	// #nosec G304 -- filename is a config file path provided by the user
 	data, err := os.ReadFile(filename)
 	if ee, ok := err.(*os.PathError); ok {
-		mglog.Error("Error: ", ee)
+		log.Error().Err(ee).Str("filename", filename).Msg("Failed to read project file")
 		return nil, err
 	}
 
@@ -97,12 +102,18 @@ func ParseProjectFile(filename string) (*Project, error) {
 	// Detect file format by extension
 	ext := strings.ToLower(filepath.Ext(filename))
 
+	log.Debug().Str("filename", filename).Str("extension", ext).Msg("Parsing project file")
+
 	if ext == ".toml" {
 		// Parse TOML format
 		err = toml.Unmarshal(data, &proj)
 	} else {
 		// Default to JSON format for .json or other extensions
 		err = json.Unmarshal(data, &proj)
+	}
+
+	if err != nil {
+		log.Error().Err(err).Str("filename", filename).Msg("Failed to parse project file")
 	}
 
 	return &proj, err
@@ -114,13 +125,18 @@ func (proj *Project) ProcessDeps() {
 	proj.node = proj.graph.MakeNode()
 	*proj.node.Value = proj
 
+	log.Debug().Str("project", proj.Name).Msg("Processing project dependencies")
+
 	// Build the dependency graph
 	for _, dep := range proj.Deps.Build {
-		mglog.Debug("Processing build dependency ", dep.Name)
+		log.Debug().Str("dependency", dep.Name).Str("type", "build").Msg("Processing dependency")
 
 		// Set repoconfig if not specified
 		if dep.Repoconfig == nil {
-			mglog.Debug("Adding toplevel repoconfig to dep:", *proj.Repoconfig)
+			log.Debug().
+				Str("dependency", dep.Name).
+				Str("base", proj.Repoconfig.Base).
+				Msg("Adding toplevel repoconfig to dependency")
 			dep.Repoconfig = proj.Repoconfig
 		}
 
@@ -128,17 +144,20 @@ func (proj *Project) ProcessDeps() {
 		dep.node = proj.graph.MakeNode()
 		*dep.node.Value = dep
 		if err := proj.graph.MakeEdge(proj.node, dep.node); err != nil {
-			mglog.Error("Failed to create edge: ", err)
+			log.Error().Err(err).Str("dependency", dep.Name).Msg("Failed to create edge")
 		}
 	}
 
 	// Process runtime dependencies
 	for _, dep := range proj.Deps.Runtime {
-		mglog.Debug("Processing runtime dependency ", dep.Name)
+		log.Debug().Str("dependency", dep.Name).Str("type", "runtime").Msg("Processing dependency")
 
 		// Set repoconfig if not specified
 		if dep.Repoconfig == nil {
-			mglog.Debug("Adding toplevel repoconfig to dep:", *proj.Repoconfig)
+			log.Debug().
+				Str("dependency", dep.Name).
+				Str("base", proj.Repoconfig.Base).
+				Msg("Adding toplevel repoconfig to dependency")
 			dep.Repoconfig = proj.Repoconfig
 		}
 
@@ -146,13 +165,16 @@ func (proj *Project) ProcessDeps() {
 		dep.node = proj.graph.MakeNode()
 		*dep.node.Value = dep
 		if err := proj.graph.MakeEdge(proj.node, dep.node); err != nil {
-			mglog.Error("Failed to create edge: ", err)
+			log.Error().Err(err).Str("dependency", dep.Name).Msg("Failed to create edge")
 		}
 	}
+
+	log.Debug().Str("project", proj.Name).Int("total_deps", len(proj.Deps.Build)+len(proj.Deps.Runtime)).Msg("Finished processing dependencies")
 }
 
 // Sort iterates all build dependencies.
 func (proj *Project) Sort() {
-	mglog.Debug("Sorting project ", proj.Name)
+	log.Debug().Str("project", proj.Name).Msg("Sorting project dependencies")
 	proj.sorted = proj.graph.TopologicalSort()
+	log.Debug().Str("project", proj.Name).Int("sorted_count", len(proj.sorted)).Msg("Dependencies sorted")
 }
