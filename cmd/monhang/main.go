@@ -54,6 +54,7 @@ The commands are:
 
 	boot        bootstraps a workspace
 	exec        run arbitrary commands inside each repo
+	git         run git operations across all repos
 	version     print monhang version
 
 Use "monhang help [command]" for more information about a command.`)
@@ -71,6 +72,7 @@ var cmdHelp = &monhang.Command{
 var commands = []*monhang.Command{
 	monhang.CmdBoot,
 	monhang.CmdExec,
+	monhang.CmdGit,
 	cmdHelp,
 }
 
