@@ -34,6 +34,7 @@ func runBoot(_ *Command, _ []string) {
 	// Parse the toplevel project file
 	proj, err := ParseProjectFile(filename)
 	if err != nil {
+		logging.GetLogger("bootstrap").Error().Err(err).Str("filename", filename).Msg("Failed to parse project file")
 		Check(err)
 	}
 

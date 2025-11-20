@@ -85,8 +85,7 @@ func ParseProjectFile(filename string) (*Project, error) {
 	var data []byte
 	// #nosec G304 -- filename is a config file path provided by the user
 	data, err := os.ReadFile(filename)
-	if ee, ok := err.(*os.PathError); ok {
-		logging.GetLogger("component").Error().Err(ee).Str("filename", filename).Msg("Failed to read project file")
+	if err != nil {
 		return nil, err
 	}
 
@@ -103,10 +102,6 @@ func ParseProjectFile(filename string) (*Project, error) {
 	} else {
 		// Default to JSON format for .json or other extensions
 		err = json.Unmarshal(data, &proj)
-	}
-
-	if err != nil {
-		logging.GetLogger("component").Error().Err(err).Str("filename", filename).Msg("Failed to parse project file")
 	}
 
 	return &proj, err
