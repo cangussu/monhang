@@ -35,6 +35,7 @@ func TestGitFetch(t *testing.T) {
 	}
 }
 
+//nolint:gocognit,gocyclo // Test validation function with comprehensive checks
 func validateProjectConfig(t *testing.T, proj *Project) {
 	t.Helper()
 
@@ -72,6 +73,59 @@ func validateProjectConfig(t *testing.T, proj *Project) {
 		}
 		if proj.Deps.Build[0].Version != "v1.0.0" {
 			t.Errorf("Expected first dep version 'v1.0.0', got '%s'", proj.Deps.Build[0].Version)
+		}
+	}
+
+	// Validate components
+	if len(proj.Components) != 2 {
+		t.Errorf("Expected 2 components, got %d", len(proj.Components))
+	}
+
+	if len(proj.Components) > 0 {
+		// First component
+		comp := proj.Components[0]
+		if comp.Name != "core" {
+			t.Errorf("Expected first component name 'core', got '%s'", comp.Name)
+		}
+		if comp.Description != "Core library component" {
+			t.Errorf("Expected first component description 'Core library component', got '%s'", comp.Description)
+		}
+		if comp.Source != "git://github.com/monhang/core.git?version=v1.0.0&type=git" {
+			t.Errorf("Expected first component source 'git://github.com/monhang/core.git?version=v1.0.0&type=git', got '%s'", comp.Source)
+		}
+
+		// First component's child
+		if len(comp.Children) != 1 {
+			t.Errorf("Expected first component to have 1 child, got %d", len(comp.Children))
+		}
+		if len(comp.Children) > 0 {
+			child := comp.Children[0]
+			if child.Name != "utils" {
+				t.Errorf("Expected child component name 'utils', got '%s'", child.Name)
+			}
+			if child.Description != "Utility functions" {
+				t.Errorf("Expected child component description 'Utility functions', got '%s'", child.Description)
+			}
+			if child.Source != "git://github.com/monhang/utils.git?version=v2.1.0&type=git" {
+				t.Errorf("Expected child component source 'git://github.com/monhang/utils.git?version=v2.1.0&type=git', got '%s'", child.Source)
+			}
+		}
+	}
+
+	if len(proj.Components) > 1 {
+		// Second component
+		comp := proj.Components[1]
+		if comp.Name != "plugin" {
+			t.Errorf("Expected second component name 'plugin', got '%s'", comp.Name)
+		}
+		if comp.Description != "Plugin system" {
+			t.Errorf("Expected second component description 'Plugin system', got '%s'", comp.Description)
+		}
+		if comp.Source != "git://github.com/monhang/plugin.git?version=v3.0.1&type=git" {
+			t.Errorf("Expected second component source 'git://github.com/monhang/plugin.git?version=v3.0.1&type=git', got '%s'", comp.Source)
+		}
+		if len(comp.Children) != 0 {
+			t.Errorf("Expected second component to have 0 children, got %d", len(comp.Children))
 		}
 	}
 }
