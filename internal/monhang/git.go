@@ -129,6 +129,16 @@ func getRepoStatus(ctx context.Context, dir string) string {
 	return fmt.Sprintf("%d changes", len(lines))
 }
 
+// isGitRepository checks if the given directory is a git repository.
+func isGitRepository(dir string) bool {
+	gitDir := filepath.Join(dir, ".git")
+	info, err := os.Stat(gitDir)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
 // ExecuteStatus runs git status on a repository.
 func (ge *GitExecutor) ExecuteStatus(ctx context.Context, name, path string) {
 	logging.GetLogger("git").Debug().Str("repo", name).Str("operation", "status").Msg("Starting git status")
@@ -765,10 +775,25 @@ func runGit(_ *Command, args []string) {
 		Bool("parallel", *gitParallel).
 		Msg("Starting git command")
 
-	// Parse configuration
+	// Try to parse configuration file
 	proj, err := ParseProjectFile(*gitF)
 	if err != nil {
-		Check(err)
+		// If config file doesn't exist, check if current directory is a git repo
+		if isGitRepository(".") {
+			logging.GetLogger("git").Info().Msg("No config file found, but current directory is a git repository")
+			// Create a minimal project with just the current directory
+			cwd, _ := os.Getwd()
+			dirName := filepath.Base(cwd)
+			proj = &Project{
+				ComponentRef: ComponentRef{
+					Name: dirName,
+				},
+			}
+		} else {
+			// Not a git repo and no config file - fail
+			logging.GetLogger("git").Error().Err(err).Msg("Config file not found and current directory is not a git repository")
+			Check(err)
+		}
 	}
 
 	proj.ProcessDeps()
