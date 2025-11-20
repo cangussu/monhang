@@ -780,7 +780,7 @@ func runGit(_ *Command, args []string) {
 	if err != nil {
 		// If config file doesn't exist, check if current directory is a git repo
 		if isGitRepository(".") {
-			logging.GetLogger("git").Info().Msg("No config file found, but current directory is a git repository")
+			logging.GetLogger("git").Debug().Msg("No config file found, using current directory as git repository")
 			// Create a minimal project with just the current directory
 			// Use "." as the name so getRepos() will find it in the current directory
 			proj = &Project{
@@ -790,7 +790,6 @@ func runGit(_ *Command, args []string) {
 			}
 		} else {
 			// Not a git repo and no config file - fail
-			logging.GetLogger("git").Error().Err(err).Msg("Config file not found and current directory is not a git repository")
 			Check(err)
 		}
 	}

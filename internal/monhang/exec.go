@@ -517,6 +517,7 @@ func runExec(_ *Command, args []string) {
 	// Parse the configuration file
 	proj, err := ParseProjectFile(*execF)
 	if err != nil {
+		logging.GetLogger("exec").Error().Err(err).Str("filename", *execF).Msg("Failed to parse project file")
 		Check(err)
 	}
 
