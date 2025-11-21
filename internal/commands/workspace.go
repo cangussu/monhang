@@ -2,12 +2,13 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
-package monhang
+package commands
 
 import (
 	"fmt"
 	"os"
 
+	"github.com/cangussu/monhang/internal/components"
 	"github.com/cangussu/monhang/internal/logging"
 )
 
@@ -60,7 +61,7 @@ var (
 func handleWorkspaceSync(filename string) {
 	logging.GetLogger("workspace").Info().Str("file", filename).Msg("Starting workspace sync")
 
-	proj, err := ParseProjectFile(filename)
+	proj, err := components.ParseProjectFile(filename)
 	Check(err)
 
 	if len(proj.Components) == 0 {
@@ -81,7 +82,7 @@ func handleWorkspaceSync(filename string) {
 }
 
 // syncComponent synchronizes a component and its children.
-func syncComponent(comp Component, depth int) {
+func syncComponent(comp components.Component, depth int) {
 	indent := ""
 	for i := 0; i < depth; i++ {
 		indent += "  "

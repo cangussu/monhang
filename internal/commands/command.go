@@ -2,7 +2,7 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
-package monhang
+package commands
 
 import (
 	"flag"

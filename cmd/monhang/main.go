@@ -25,8 +25,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cangussu/monhang/internal/commands"
 	"github.com/cangussu/monhang/internal/logging"
-	"github.com/cangussu/monhang/internal/monhang"
 )
 
 var (
@@ -63,20 +63,20 @@ Use "monhang help [command]" for more information about a command.`)
 	os.Exit(0)
 }
 
-var cmdHelp = &monhang.Command{
+var cmdHelp = &commands.Command{
 	Name: "help",
-	Run: func(_ *monhang.Command, _ []string) {
+	Run: func(_ *commands.Command, _ []string) {
 		// TODO(cangussu): print the help for the command given in args
 		usageExit()
 	},
 }
 
-var commands = []*monhang.Command{
-	monhang.CmdBoot,
-	monhang.CmdExec,
-	monhang.CmdGit,
-	monhang.CmdWorkspace,
-	monhang.CmdWs,
+var cmds = []*commands.Command{
+	commands.CmdBoot,
+	commands.CmdExec,
+	commands.CmdGit,
+	commands.CmdWorkspace,
+	commands.CmdWs,
 	cmdHelp,
 }
 
@@ -93,7 +93,7 @@ func main() {
 		usageExit()
 	}
 
-	for _, cmd := range commands {
+	for _, cmd := range cmds {
 		if cmd.Name == args[0] {
 			if err := cmd.Flag.Parse(args[1:]); err != nil {
 				fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)

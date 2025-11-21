@@ -2,9 +2,10 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
-package monhang
+package commands
 
 import (
+	"github.com/cangussu/monhang/internal/components"
 	"github.com/cangussu/monhang/internal/logging"
 )
 
@@ -32,7 +33,7 @@ func runBoot(_ *Command, _ []string) {
 	logging.GetLogger("bootstrap").Info().Str("config", filename).Msg("Starting bootstrap process")
 
 	// Parse the toplevel project file
-	proj, err := ParseProjectFile(filename)
+	proj, err := components.ParseProjectFile(filename)
 	if err != nil {
 		logging.GetLogger("bootstrap").Error().Err(err).Str("filename", filename).Msg("Failed to parse project file")
 		Check(err)
@@ -47,19 +48,10 @@ func runBoot(_ *Command, _ []string) {
 	// Fetch all dependencies
 	logging.GetLogger("bootstrap").Info().Msg("Fetching dependencies...")
 	fetchedCount := 0
-	for _, node := range proj.sorted {
-		if node.Value == nil {
-			continue
-		}
-		comp, ok := (*node.Value).(ComponentRef)
-		if !ok {
-			logging.GetLogger("bootstrap").Warn().Msg("Skipping non-ComponentRef node")
-			continue
-		}
-		logging.GetLogger("bootstrap").Info().Str("component", comp.Name).Str("version", comp.Version).Msg("Fetching component")
+	proj.ForEach(func(comp *components.ComponentRef) {
 		comp.Fetch()
 		fetchedCount++
-	}
+	})
 	logging.GetLogger("bootstrap").Info().Int("count", fetchedCount).Msg("All dependencies fetched successfully")
 }
 

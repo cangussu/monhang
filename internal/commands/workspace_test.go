@@ -2,7 +2,7 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
-package monhang
+package commands
 
 import (
 	"bytes"
@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/cangussu/monhang/internal/components"
 )
 
 const (
@@ -23,11 +25,11 @@ const (
 )
 
 func TestSyncComponentTree(t *testing.T) {
-	comp := Component{
+	comp := components.Component{
 		Name:        testComponentCoreName,
 		Source:      testComponentCoreSource,
 		Description: testComponentCoreDescription,
-		Children: []Component{
+		Children: []components.Component{
 			{
 				Name:        testComponentUtilsName,
 				Source:      testComponentUtilsSource,
@@ -80,7 +82,7 @@ func TestSyncComponentTree(t *testing.T) {
 	}
 }
 
-func validateComponents(t *testing.T, proj *Project) {
+func validateComponents(t *testing.T, proj *components.Project) {
 	t.Helper()
 
 	if len(proj.Components) != 2 {
@@ -124,7 +126,7 @@ func validateComponents(t *testing.T, proj *Project) {
 }
 
 func TestParseComponentsFromJSON(t *testing.T) {
-	proj, err := ParseProjectFile("testdata/monhang.json")
+	proj, err := components.ParseProjectFile("../testdata/monhang.json")
 	if err != nil {
 		t.Fatalf("Failed to parse JSON config: %v", err)
 	}
@@ -133,7 +135,7 @@ func TestParseComponentsFromJSON(t *testing.T) {
 }
 
 func TestParseComponentsFromTOML(t *testing.T) {
-	proj, err := ParseProjectFile("testdata/monhang.toml")
+	proj, err := components.ParseProjectFile("../testdata/monhang.toml")
 	if err != nil {
 		t.Fatalf("Failed to parse TOML config: %v", err)
 	}
@@ -143,11 +145,11 @@ func TestParseComponentsFromTOML(t *testing.T) {
 
 func TestEmptyComponentsList(t *testing.T) {
 	// Create a project with no components
-	proj := &Project{
-		ComponentRef: ComponentRef{
+	proj := &components.Project{
+		ComponentRef: components.ComponentRef{
 			Name: "test-app",
 		},
-		Components: []Component{},
+		Components: []components.Component{},
 	}
 
 	if len(proj.Components) != 0 {

@@ -3,7 +3,7 @@
 // version 3 that can be found in the LICENSE file.
 
 // Package monhang provides component management functionality.
-package monhang
+package components
 
 import (
 	"encoding/json"
@@ -117,6 +117,34 @@ func ParseProjectFile(filename string) (*Project, error) {
 	return &proj, err
 }
 
+// CreateLocalProject creates a project representing the current directory as a git repository.
+func CreateLocalProject(name string) *Project {
+	logging.GetLogger("git").Debug().Msg("No config file found, using current directory as git repository")
+	// Create a minimal project with just the current directory
+	// Use "." as the name so getRepos() will find it in the current directory
+	proj := &Project{
+		ComponentRef: ComponentRef{
+			Name: name,
+		},
+	}
+	return proj
+}
+
+// ForEach iterates over each ComponentRef in the project.
+func (proj *Project) ForEach(fn func(*ComponentRef)) {
+	for _, node := range proj.sorted {
+		if node.Value == nil {
+			continue
+		}
+		comp, ok := (*node.Value).(ComponentRef)
+		if !ok {
+			logging.GetLogger("component").Warn().Msg("Skipping non-monhang.ComponentRef node")
+			continue
+		}
+		fn(&comp)
+	}
+}
+
 // ProcessDeps builds the dependency graph for the project.
 func (proj *Project) ProcessDeps() {
 	proj.graph = graph.New(graph.Directed)
@@ -161,7 +189,7 @@ func (proj *Project) ProcessDeps() {
 
 		// Create dependency edge
 		dep.node = proj.graph.MakeNode()
-		*dep.node.Value = dep
+		*dep.node.Value = &dep
 		if err := proj.graph.MakeEdge(proj.node, dep.node); err != nil {
 			logging.GetLogger("component").Error().Err(err).Str("dependency", dep.Name).Msg("Failed to create edge")
 		}

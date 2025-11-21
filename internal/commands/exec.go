@@ -2,7 +2,7 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
-package monhang
+package commands
 
 import (
 	"bufio"
@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cangussu/monhang/internal/components"
 	"github.com/cangussu/monhang/internal/logging"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -188,7 +189,7 @@ func (re *RepoExecutor) GetResults() map[string]*RepoResult {
 //
 //nolint:govet // fieldalignment: UI model where field order doesn't significantly impact performance
 type model struct {
-	repos       []ComponentRef
+	repos       []components.ComponentRef
 	results     map[string]*RepoResult
 	executor    *RepoExecutor
 	command     string
@@ -390,7 +391,7 @@ func (m model) View() string {
 }
 
 // runInteractiveMode starts command execution in interactive mode with bubbletea UI.
-func runInteractiveMode(repos []ComponentRef, executor *RepoExecutor, command string, parallel bool) error {
+func runInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor, command string, parallel bool) error {
 	ctx := context.Background()
 
 	// Start all executions
@@ -398,7 +399,7 @@ func runInteractiveMode(repos []ComponentRef, executor *RepoExecutor, command st
 		var wg sync.WaitGroup
 		for _, repo := range repos {
 			wg.Add(1)
-			go func(r ComponentRef) {
+			go func(r components.ComponentRef) {
 				defer wg.Done()
 				path := filepath.Join(".", r.Name)
 				executor.ExecuteCommand(ctx, r.Name, path, command)
@@ -434,7 +435,7 @@ func runInteractiveMode(repos []ComponentRef, executor *RepoExecutor, command st
 }
 
 // runNonInteractiveMode executes commands in non-interactive mode.
-func runNonInteractiveMode(repos []ComponentRef, executor *RepoExecutor, command string, parallel bool) {
+func runNonInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor, command string, parallel bool) {
 	ctx := context.Background()
 
 	if parallel {
@@ -442,7 +443,7 @@ func runNonInteractiveMode(repos []ComponentRef, executor *RepoExecutor, command
 		var wg sync.WaitGroup
 		for _, repo := range repos {
 			wg.Add(1)
-			go func(r ComponentRef) {
+			go func(r components.ComponentRef) {
 				defer wg.Done()
 				path := filepath.Join(".", r.Name)
 				logging.GetLogger("exec").Info().Str("repo", r.Name).Str("command", command).Msg("Executing command")
@@ -461,7 +462,7 @@ func runNonInteractiveMode(repos []ComponentRef, executor *RepoExecutor, command
 }
 
 // printResults prints the execution results for all repos.
-func printResults(repos []ComponentRef, results map[string]*RepoResult) int {
+func printResults(repos []components.ComponentRef, results map[string]*RepoResult) int {
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("EXECUTION RESULTS")
 	fmt.Println(strings.Repeat("=", 80))
@@ -515,7 +516,7 @@ func runExec(_ *Command, args []string) {
 		Msg("Starting exec command")
 
 	// Parse the configuration file
-	proj, err := ParseProjectFile(*execF)
+	proj, err := components.ParseProjectFile(*execF)
 	if err != nil {
 		logging.GetLogger("exec").Error().Err(err).Str("filename", *execF).Msg("Failed to parse project file")
 		Check(err)
@@ -523,7 +524,7 @@ func runExec(_ *Command, args []string) {
 
 	// Build list of repos
 	proj.ProcessDeps()
-	repos := []ComponentRef{proj.ComponentRef}
+	repos := []components.ComponentRef{proj.ComponentRef}
 	repos = append(repos, proj.Deps.Build...)
 	repos = append(repos, proj.Deps.Runtime...)
 	repos = append(repos, proj.Deps.Intall...)
