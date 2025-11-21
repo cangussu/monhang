@@ -43,7 +43,8 @@ func TestSyncComponentTree(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	syncComponent(comp, 0)
+	results := &SyncResults{}
+	syncComponent(comp, 0, results)
 
 	if err := w.Close(); err != nil {
 		t.Fatalf("Failed to close pipe writer: %v", err)
@@ -61,24 +62,81 @@ func TestSyncComponentTree(t *testing.T) {
 		t.Errorf("Expected output to contain '%s', got: %s", testComponentCoreName, output)
 	}
 
-	// Verify output contains component description
-	if !strings.Contains(output, testComponentCoreDescription) {
-		t.Errorf("Expected output to contain '%s', got: %s", testComponentCoreDescription, output)
-	}
-
-	// Verify output contains component source
-	if !strings.Contains(output, testComponentCoreSource) {
-		t.Errorf("Expected output to contain source URL, got: %s", output)
-	}
-
 	// Verify output contains child component
 	if !strings.Contains(output, testComponentUtilsName) {
 		t.Errorf("Expected output to contain child '%s', got: %s", testComponentUtilsName, output)
 	}
 
-	// Verify output contains child description
-	if !strings.Contains(output, testComponentUtilsDesc) {
-		t.Errorf("Expected output to contain '%s', got: %s", testComponentUtilsDesc, output)
+	// Verify results were collected (should have 2 results - parent and child)
+	if len(results.Results) != 2 {
+		t.Errorf("Expected 2 sync results, got %d", len(results.Results))
+	}
+}
+
+func TestParseSourceURL(t *testing.T) {
+	tests := []struct {
+		source      string
+		wantURL     string
+		wantVersion string
+		wantType    string
+	}{
+		{
+			source:      "git://github.com/monhang/core.git?version=v1.0.0&type=git",
+			wantURL:     "https://github.com/monhang/core.git",
+			wantVersion: "v1.0.0",
+			wantType:    "git",
+		},
+		{
+			source:      "file:///path/to/repo.git?version=v2.0.0&type=git",
+			wantURL:     "file:///path/to/repo.git",
+			wantVersion: "v2.0.0",
+			wantType:    "git",
+		},
+		{
+			source:      "https://github.com/org/repo.git",
+			wantURL:     "https://github.com/org/repo.git",
+			wantVersion: "",
+			wantType:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.source, func(t *testing.T) {
+			gotURL, gotVersion, gotType := parseSourceURL(tt.source)
+			if gotURL != tt.wantURL {
+				t.Errorf("parseSourceURL() URL = %v, want %v", gotURL, tt.wantURL)
+			}
+			if gotVersion != tt.wantVersion {
+				t.Errorf("parseSourceURL() version = %v, want %v", gotVersion, tt.wantVersion)
+			}
+			if gotType != tt.wantType {
+				t.Errorf("parseSourceURL() type = %v, want %v", gotType, tt.wantType)
+			}
+		})
+	}
+}
+
+func TestSyncResultsAdd(t *testing.T) {
+	results := &SyncResults{}
+
+	results.Add("comp1", SyncActionCloned, "v1.0.0", nil)
+	results.Add("comp2", SyncActionUpdated, "v2.0.0", nil)
+	results.Add("comp3", SyncActionFailed, "", nil)
+
+	if len(results.Results) != 3 {
+		t.Errorf("Expected 3 results, got %d", len(results.Results))
+	}
+
+	if results.Results[0].Name != "comp1" || results.Results[0].Action != SyncActionCloned {
+		t.Errorf("First result incorrect: %+v", results.Results[0])
+	}
+
+	if results.Results[1].Name != "comp2" || results.Results[1].Action != SyncActionUpdated {
+		t.Errorf("Second result incorrect: %+v", results.Results[1])
+	}
+
+	if results.Results[2].Name != "comp3" || results.Results[2].Action != SyncActionFailed {
+		t.Errorf("Third result incorrect: %+v", results.Results[2])
 	}
 }
 
