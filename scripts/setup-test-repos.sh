@@ -81,9 +81,12 @@ EOF
     # Tag the version
     git tag -a v1.0.0 -m "Version 1.0.0" > /dev/null 2>&1
 
+    # Get current branch name (supports both master and main)
+    local branch=$(git branch --show-current)
+
     # Push to bare repo
     git remote add origin "file://${repo_path}"
-    git push -u origin main > /dev/null 2>&1
+    git push -u origin "${branch}" > /dev/null 2>&1
     git push --tags > /dev/null 2>&1
 
     # Clean up temp directory
@@ -118,6 +121,36 @@ cat > "${TEST_DIR}/monhang.json" <<EOF
     "type": "git",
     "base": "file://${REPOS_DIR}/"
   },
+
+  "components": [
+    {
+      "source": "file://${REPOS_DIR}/lib-core.git?version=v1.0.0&type=git",
+      "name": "lib-core",
+      "description": "Core library with base functionality",
+      "children": [
+        {
+          "source": "file://${REPOS_DIR}/lib-utils.git?version=v1.0.0&type=git",
+          "name": "lib-utils",
+          "description": "Utility library with common functions"
+        }
+      ]
+    },
+    {
+      "source": "file://${REPOS_DIR}/lib-network.git?version=v1.0.0&type=git",
+      "name": "lib-network",
+      "description": "Network communication library"
+    },
+    {
+      "source": "file://${REPOS_DIR}/app-backend.git?version=v1.0.0&type=git",
+      "name": "app-backend",
+      "description": "Backend application"
+    },
+    {
+      "source": "file://${REPOS_DIR}/app-frontend.git?version=v1.0.0&type=git",
+      "name": "app-frontend",
+      "description": "Frontend application"
+    }
+  ],
 
   "deps": {
     "build": [
@@ -155,14 +188,45 @@ repo = "file://${REPOS_DIR}/app-backend.git"
 type = "git"
 base = "file://${REPOS_DIR}/"
 
-[deps]
-build = [
-  { name = "lib-utils", version = "v1.0.0", repo = "lib-utils.git" },
-  { name = "lib-core", version = "v1.0.0", repo = "lib-core.git" }
-]
-runtime = [
-  { name = "lib-network", version = "v1.0.0", repo = "lib-network.git" }
-]
+[[components]]
+source = "file://${REPOS_DIR}/lib-core.git?version=v1.0.0&type=git"
+name = "lib-core"
+description = "Core library with base functionality"
+
+[[components.children]]
+source = "file://${REPOS_DIR}/lib-utils.git?version=v1.0.0&type=git"
+name = "lib-utils"
+description = "Utility library with common functions"
+
+[[components]]
+source = "file://${REPOS_DIR}/lib-network.git?version=v1.0.0&type=git"
+name = "lib-network"
+description = "Network communication library"
+
+[[components]]
+source = "file://${REPOS_DIR}/app-backend.git?version=v1.0.0&type=git"
+name = "app-backend"
+description = "Backend application"
+
+[[components]]
+source = "file://${REPOS_DIR}/app-frontend.git?version=v1.0.0&type=git"
+name = "app-frontend"
+description = "Frontend application"
+
+[[deps.build]]
+name = "lib-utils"
+version = "v1.0.0"
+repo = "lib-utils.git"
+
+[[deps.build]]
+name = "lib-core"
+version = "v1.0.0"
+repo = "lib-core.git"
+
+[[deps.runtime]]
+name = "lib-network"
+version = "v1.0.0"
+repo = "lib-network.git"
 EOF
 
 echo -e "  ${GREEN}✓${NC} Created monhang.toml"
@@ -203,5 +267,6 @@ echo ""
 echo "Next steps:"
 echo "  1. cd ${TEST_DIR}"
 echo "  2. ../dist/monhang boot -f monhang.json"
-echo "  3. ../dist/monhang exec -f monhang.json -- ./test-exec.sh"
+echo "  3. ../dist/monhang workspace sync -f monhang.json"
+echo "  4. ../dist/monhang exec -f monhang.json -- ./test-exec.sh"
 echo ""
