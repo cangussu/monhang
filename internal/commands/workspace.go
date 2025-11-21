@@ -12,10 +12,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/cangussu/monhang/internal/components"
 	"github.com/cangussu/monhang/internal/logging"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 )
 
 // CmdWorkspace is the workspace command for managing workspace components.
@@ -72,25 +76,64 @@ const (
 
 // SyncResult represents the result of syncing a single component.
 type SyncResult struct {
-	Error   error
-	Name    string
-	Action  string // SyncActionCloned, SyncActionUpdated, SyncActionFailed
-	Version string
+	Error      error
+	Name       string
+	Action     string // SyncActionCloned, SyncActionUpdated, SyncActionFailed
+	Version    string
+	InProgress bool
 }
 
 // SyncResults collects all sync results for final reporting.
 type SyncResults struct {
 	Results []SyncResult
+	mu      sync.RWMutex
 }
 
 // Add adds a result to the collection.
 func (sr *SyncResults) Add(name, action, version string, err error) {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
 	sr.Results = append(sr.Results, SyncResult{
-		Name:    name,
-		Action:  action,
-		Version: version,
-		Error:   err,
+		Name:       name,
+		Action:     action,
+		Version:    version,
+		Error:      err,
+		InProgress: false,
 	})
+}
+
+// SetInProgress marks a component as in-progress.
+func (sr *SyncResults) SetInProgress(name string) {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	sr.Results = append(sr.Results, SyncResult{
+		Name:       name,
+		InProgress: true,
+	})
+}
+
+// UpdateResult updates an in-progress result.
+func (sr *SyncResults) UpdateResult(name, action, version string, err error) {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	for i := range sr.Results {
+		if sr.Results[i].Name == name && sr.Results[i].InProgress {
+			sr.Results[i].Action = action
+			sr.Results[i].Version = version
+			sr.Results[i].Error = err
+			sr.Results[i].InProgress = false
+			return
+		}
+	}
+}
+
+// GetResults returns a copy of all results.
+func (sr *SyncResults) GetResults() []SyncResult {
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	resultsCopy := make([]SyncResult, len(sr.Results))
+	copy(resultsCopy, sr.Results)
+	return resultsCopy
 }
 
 // parseSourceURL extracts the repository URL and version from a component source.
@@ -252,83 +295,118 @@ func handleWorkspaceSync(filename string) {
 		return
 	}
 
-	fmt.Printf("Syncing %d component(s) from %s\n\n", len(proj.Components), filename)
-
 	// Collect results
 	results := &SyncResults{}
 
-	// Process each component in the tree
-	for _, comp := range proj.Components {
-		syncComponent(comp, 0, results)
-	}
+	// Collect all components (flatten tree)
+	allComponents := flattenComponents(proj.Components)
 
-	// Print final report
-	printSyncReport(results)
+	// Run interactive sync
+	if err := runInteractiveSync(filename, allComponents, results); err != nil {
+		fmt.Printf("Error running interactive sync: %v\n", err)
+		os.Exit(1)
+	}
 
 	logging.GetLogger("workspace").Info().Msg("Workspace sync completed")
 }
 
-// syncComponent synchronizes a component and its children.
-func syncComponent(comp components.Component, depth int, results *SyncResults) {
-	indent := ""
-	for i := 0; i < depth; i++ {
-		indent += "  "
-	}
-
-	logging.GetLogger("workspace").Debug().
-		Str("name", comp.Name).
-		Str("source", comp.Source).
-		Int("depth", depth).
-		Msg("Processing component")
-
-	fmt.Printf("%s- %s\n", indent, comp.Name)
-
-	// Parse source URL
-	repoURL, version, _ := parseSourceURL(comp.Source)
-
-	if componentExists(comp.Name) {
-		// Component exists - try to update
-		fmt.Printf("%s  Updating...\n", indent)
-		action, err := updateComponent(comp.Name, version)
-		if err != nil {
-			fmt.Printf("%s  Error: %v\n", indent, err)
-			results.Add(comp.Name, SyncActionFailed, "", err)
-		} else {
-			currentVer := getCurrentVersion(comp.Name)
-			fmt.Printf("%s  Version: %s\n", indent, currentVer)
-			results.Add(comp.Name, action, currentVer, nil)
-		}
-	} else {
-		// Component missing - clone it
-		fmt.Printf("%s  Cloning from %s\n", indent, repoURL)
-		err := cloneComponent(comp.Name, repoURL, version)
-		if err != nil {
-			fmt.Printf("%s  Error: %v\n", indent, err)
-			results.Add(comp.Name, SyncActionFailed, "", err)
-		} else {
-			currentVer := getCurrentVersion(comp.Name)
-			fmt.Printf("%s  Version: %s\n", indent, currentVer)
-			results.Add(comp.Name, SyncActionCloned, currentVer, nil)
+// flattenComponents flattens the component tree into a list.
+func flattenComponents(comps []components.Component) []components.Component {
+	// Pre-allocate with estimated capacity
+	result := make([]components.Component, 0, len(comps)*2)
+	for _, comp := range comps {
+		result = append(result, comp)
+		if len(comp.Children) > 0 {
+			result = append(result, flattenComponents(comp.Children)...)
 		}
 	}
-
-	// Process children recursively
-	for _, child := range comp.Children {
-		syncComponent(child, depth+1, results)
-	}
+	return result
 }
 
-// printSyncReport prints a summary of all sync operations.
-func printSyncReport(results *SyncResults) {
-	styles := getSyncStyles()
+// syncModel is the bubbletea model for sync operations.
+//
+//nolint:govet // fieldalignment: UI model where field order doesn't significantly impact performance
+type syncModel struct {
+	components []components.Component
+	results    *SyncResults
+	filename   string
+	allDone    bool
+	quitting   bool
+	width      int
+	height     int
+}
 
-	fmt.Println()
-	fmt.Println(styles.title.Render(" Sync Summary "))
-	fmt.Println()
+type syncTickMsg time.Time
+
+func syncTickCmd() tea.Cmd {
+	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
+		return syncTickMsg(t)
+	})
+}
+
+// Init initializes the bubbletea model.
+func (m syncModel) Init() tea.Cmd {
+	return syncTickCmd()
+}
+
+// Update handles bubbletea messages and updates the model.
+func (m syncModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case KeyCtrlC, "q":
+			m.quitting = true
+			return m, tea.Quit
+		}
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+
+	case syncTickMsg:
+		// Check if all done
+		currentResults := m.results.GetResults()
+		allDone := true
+		for _, r := range currentResults {
+			if r.InProgress {
+				allDone = false
+				break
+			}
+		}
+		m.allDone = allDone
+
+		if m.allDone {
+			return m, tea.Quit
+		}
+
+		return m, syncTickCmd()
+	}
+
+	return m, nil
+}
+
+// View renders the bubbletea UI.
+//
+//nolint:gocyclo // UI rendering function with multiple output states
+func (m syncModel) View() string {
+	if m.quitting && !m.allDone {
+		return ""
+	}
+
+	styles := getSyncStyles()
+	var s strings.Builder
+
+	s.WriteString(styles.title.Render(fmt.Sprintf(" Syncing %d component(s) from %s ", len(m.components), m.filename)))
+	s.WriteString("\n\n")
 
 	// Count results
-	var cloned, updated, failed int
-	for _, r := range results.Results {
+	currentResults := m.results.GetResults()
+	var cloned, updated, failed, inProgress int
+	for _, r := range currentResults {
+		if r.InProgress {
+			inProgress++
+			continue
+		}
 		switch r.Action {
 		case SyncActionCloned:
 			cloned++
@@ -340,38 +418,160 @@ func printSyncReport(results *SyncResults) {
 	}
 
 	// Print table header
-	headerLine := fmt.Sprintf("%-30s %-15s %-20s", "Component", "Action", "Version")
-	fmt.Println(styles.header.Render(headerLine))
-	fmt.Println(strings.Repeat("-", 70))
+	headerLine := fmt.Sprintf("%-30s %-15s %-20s", "Component", "Status", "Version")
+	s.WriteString(styles.header.Render(headerLine) + "\n")
+	s.WriteString(strings.Repeat("-", 70) + "\n")
 
 	// Print each result
-	for _, r := range results.Results {
-		var actionStyle lipgloss.Style
-		action := r.Action
+	for _, r := range currentResults {
+		var statusStyle lipgloss.Style
+		status := r.Action
 		version := r.Version
 
-		switch r.Action {
-		case SyncActionCloned:
-			actionStyle = styles.success
-		case SyncActionUpdated:
-			actionStyle = styles.success
-		case SyncActionFailed:
-			actionStyle = styles.errorStyle
-			if r.Error != nil {
-				version = r.Error.Error()
-				if len(version) > 20 {
-					version = version[:17] + "..."
+		if r.InProgress {
+			status = "syncing..."
+			statusStyle = styles.running
+			version = ""
+		} else {
+			switch r.Action {
+			case SyncActionCloned:
+				statusStyle = styles.success
+			case SyncActionUpdated:
+				statusStyle = styles.success
+			case SyncActionFailed:
+				statusStyle = styles.errorStyle
+				if r.Error != nil {
+					version = r.Error.Error()
+					if len(version) > 20 {
+						version = version[:17] + "..."
+					}
 				}
+			default:
+				statusStyle = styles.normal
 			}
-		default:
-			actionStyle = styles.normal
 		}
 
-		line := fmt.Sprintf("%-30s %-15s %-20s", r.Name, action, version)
-		fmt.Println(actionStyle.Render(line))
+		line := fmt.Sprintf("%-30s %-15s %-20s", r.Name, status, version)
+		s.WriteString(statusStyle.Render(line) + "\n")
 	}
 
 	// Print summary
+	s.WriteString("\n")
+	if m.allDone {
+		s.WriteString(styles.success.Render("✓ Sync completed!") + "\n\n")
+		s.WriteString(fmt.Sprintf("Summary: %s cloned, %s updated, %s failed\n",
+			styles.success.Render(fmt.Sprintf("%d", cloned)),
+			styles.success.Render(fmt.Sprintf("%d", updated)),
+			styles.errorStyle.Render(fmt.Sprintf("%d", failed))))
+
+		if failed > 0 {
+			s.WriteString("\n")
+			s.WriteString(styles.errorStyle.Render("Some components failed to sync. See errors above."))
+		}
+	} else {
+		s.WriteString(fmt.Sprintf("Progress: %d syncing, %d cloned, %d updated, %d failed\n",
+			inProgress, cloned, updated, failed))
+		s.WriteString("\nPress q to quit")
+	}
+
+	return s.String()
+}
+
+// runInteractiveSync runs sync operation in interactive mode.
+func runInteractiveSync(filename string, comps []components.Component, results *SyncResults) error {
+	// Check if we have a TTY
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		// Fall back to non-interactive mode
+		return runNonInteractiveSync(filename, comps, results)
+	}
+
+	// Start sync in background
+	go func() {
+		for _, comp := range comps {
+			syncComponentBackground(comp, results)
+		}
+	}()
+
+	// Start bubbletea UI
+	p := tea.NewProgram(syncModel{
+		components: comps,
+		results:    results,
+		filename:   filename,
+	})
+
+	if _, err := p.Run(); err != nil {
+		// If interactive mode fails, fall back to non-interactive
+		logging.GetLogger("workspace").Warn().Err(err).Msg("Interactive mode failed, falling back to non-interactive")
+		return runNonInteractiveSync(filename, comps, results)
+	}
+
+	return nil
+}
+
+// runNonInteractiveSync runs sync in non-interactive mode (for CI/non-TTY environments).
+func runNonInteractiveSync(filename string, comps []components.Component, results *SyncResults) error {
+	styles := getSyncStyles()
+
+	fmt.Printf("Syncing %d component(s) from %s\n\n", len(comps), filename)
+
+	// Sync all components sequentially
+	for _, comp := range comps {
+		fmt.Printf("- %s... ", comp.Name)
+		results.SetInProgress(comp.Name)
+
+		repoURL, version, _ := parseSourceURL(comp.Source)
+
+		if componentExists(comp.Name) {
+			action, err := updateComponent(comp.Name, version)
+			if err != nil {
+				fmt.Printf("%s\n", styles.errorStyle.Render("failed: "+err.Error()))
+				results.UpdateResult(comp.Name, SyncActionFailed, "", err)
+			} else {
+				currentVer := getCurrentVersion(comp.Name)
+				fmt.Printf("%s (%s)\n", styles.success.Render(action), currentVer)
+				results.UpdateResult(comp.Name, action, currentVer, nil)
+			}
+		} else {
+			err := cloneComponent(comp.Name, repoURL, version)
+			if err != nil {
+				fmt.Printf("%s\n", styles.errorStyle.Render("failed: "+err.Error()))
+				results.UpdateResult(comp.Name, SyncActionFailed, "", err)
+			} else {
+				currentVer := getCurrentVersion(comp.Name)
+				fmt.Printf("%s (%s)\n", styles.success.Render("cloned"), currentVer)
+				results.UpdateResult(comp.Name, SyncActionCloned, currentVer, nil)
+			}
+		}
+	}
+
+	// Print final summary
+	printNonInteractiveSummary(results)
+
+	return nil
+}
+
+// printNonInteractiveSummary prints a summary in non-interactive mode.
+func printNonInteractiveSummary(results *SyncResults) {
+	styles := getSyncStyles()
+
+	currentResults := results.GetResults()
+	var cloned, updated, failed int
+	for _, r := range currentResults {
+		if r.InProgress {
+			continue
+		}
+		switch r.Action {
+		case SyncActionCloned:
+			cloned++
+		case SyncActionUpdated:
+			updated++
+		case SyncActionFailed:
+			failed++
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(styles.title.Render(" Sync Summary "))
 	fmt.Println()
 	fmt.Printf("Summary: %s cloned, %s updated, %s failed\n",
 		styles.success.Render(fmt.Sprintf("%d", cloned)),
@@ -380,7 +580,41 @@ func printSyncReport(results *SyncResults) {
 
 	if failed > 0 {
 		fmt.Println()
-		fmt.Println(styles.errorStyle.Render("Some components failed to sync. See errors above."))
+		fmt.Println(styles.errorStyle.Render("Some components failed to sync."))
+	}
+}
+
+// syncComponentBackground synchronizes a component in the background.
+func syncComponentBackground(comp components.Component, results *SyncResults) {
+	logging.GetLogger("workspace").Debug().
+		Str("name", comp.Name).
+		Str("source", comp.Source).
+		Msg("Processing component in background")
+
+	// Mark as in-progress
+	results.SetInProgress(comp.Name)
+
+	// Parse source URL
+	repoURL, version, _ := parseSourceURL(comp.Source)
+
+	if componentExists(comp.Name) {
+		// Component exists - try to update
+		action, err := updateComponent(comp.Name, version)
+		if err != nil {
+			results.UpdateResult(comp.Name, SyncActionFailed, "", err)
+		} else {
+			currentVer := getCurrentVersion(comp.Name)
+			results.UpdateResult(comp.Name, action, currentVer, nil)
+		}
+	} else {
+		// Component missing - clone it
+		err := cloneComponent(comp.Name, repoURL, version)
+		if err != nil {
+			results.UpdateResult(comp.Name, SyncActionFailed, "", err)
+		} else {
+			currentVer := getCurrentVersion(comp.Name)
+			results.UpdateResult(comp.Name, SyncActionCloned, currentVer, nil)
+		}
 	}
 }
 
@@ -390,6 +624,7 @@ type syncStyles struct {
 	header     lipgloss.Style
 	success    lipgloss.Style
 	errorStyle lipgloss.Style
+	running    lipgloss.Style
 	normal     lipgloss.Style
 }
 
@@ -409,6 +644,8 @@ func getSyncStyles() syncStyles {
 			Foreground(lipgloss.Color("#04B575")),
 		errorStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FF0000")),
+		running: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFAA00")),
 		normal: lipgloss.NewStyle(),
 	}
 }

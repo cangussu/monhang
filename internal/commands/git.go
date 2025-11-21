@@ -354,7 +354,7 @@ func (m gitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case KeyCtrlC, "q":
 			m.quitting = true
 			return m, tea.Quit
 		case "up", "k":

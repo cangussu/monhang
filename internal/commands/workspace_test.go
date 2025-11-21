@@ -5,10 +5,6 @@
 package commands
 
 import (
-	"bytes"
-	"io"
-	"os"
-	"strings"
 	"testing"
 
 	"github.com/cangussu/monhang/internal/components"
@@ -24,52 +20,43 @@ const (
 	testComponentPluginName      = "plugin"
 )
 
-func TestSyncComponentTree(t *testing.T) {
-	comp := components.Component{
-		Name:        testComponentCoreName,
-		Source:      testComponentCoreSource,
-		Description: testComponentCoreDescription,
-		Children: []components.Component{
-			{
-				Name:        testComponentUtilsName,
-				Source:      testComponentUtilsSource,
-				Description: testComponentUtilsDesc,
+func TestFlattenComponents(t *testing.T) {
+	comps := []components.Component{
+		{
+			Name:        testComponentCoreName,
+			Source:      testComponentCoreSource,
+			Description: testComponentCoreDescription,
+			Children: []components.Component{
+				{
+					Name:        testComponentUtilsName,
+					Source:      testComponentUtilsSource,
+					Description: testComponentUtilsDesc,
+				},
 			},
+		},
+		{
+			Name:        testComponentPluginName,
+			Source:      "git://github.com/monhang/plugin.git?version=v3.0.1&type=git",
+			Description: "Plugin system",
 		},
 	}
 
-	// Capture stdout
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	flattened := flattenComponents(comps)
 
-	results := &SyncResults{}
-	syncComponent(comp, 0, results)
-
-	if err := w.Close(); err != nil {
-		t.Fatalf("Failed to close pipe writer: %v", err)
-	}
-	os.Stdout = old
-
-	var buf bytes.Buffer
-	if _, err := io.Copy(&buf, r); err != nil {
-		t.Fatalf("Failed to copy pipe output: %v", err)
-	}
-	output := buf.String()
-
-	// Verify output contains component name
-	if !strings.Contains(output, testComponentCoreName) {
-		t.Errorf("Expected output to contain '%s', got: %s", testComponentCoreName, output)
+	// Should have 3 components: core, utils (child), plugin
+	if len(flattened) != 3 {
+		t.Errorf("Expected 3 flattened components, got %d", len(flattened))
 	}
 
-	// Verify output contains child component
-	if !strings.Contains(output, testComponentUtilsName) {
-		t.Errorf("Expected output to contain child '%s', got: %s", testComponentUtilsName, output)
+	// Verify order: core, utils, plugin
+	if flattened[0].Name != testComponentCoreName {
+		t.Errorf("Expected first component to be '%s', got '%s'", testComponentCoreName, flattened[0].Name)
 	}
-
-	// Verify results were collected (should have 2 results - parent and child)
-	if len(results.Results) != 2 {
-		t.Errorf("Expected 2 sync results, got %d", len(results.Results))
+	if flattened[1].Name != testComponentUtilsName {
+		t.Errorf("Expected second component to be '%s', got '%s'", testComponentUtilsName, flattened[1].Name)
+	}
+	if flattened[2].Name != testComponentPluginName {
+		t.Errorf("Expected third component to be '%s', got '%s'", testComponentPluginName, flattened[2].Name)
 	}
 }
 
@@ -123,20 +110,53 @@ func TestSyncResultsAdd(t *testing.T) {
 	results.Add("comp2", SyncActionUpdated, "v2.0.0", nil)
 	results.Add("comp3", SyncActionFailed, "", nil)
 
-	if len(results.Results) != 3 {
-		t.Errorf("Expected 3 results, got %d", len(results.Results))
+	currentResults := results.GetResults()
+	if len(currentResults) != 3 {
+		t.Errorf("Expected 3 results, got %d", len(currentResults))
 	}
 
-	if results.Results[0].Name != "comp1" || results.Results[0].Action != SyncActionCloned {
-		t.Errorf("First result incorrect: %+v", results.Results[0])
+	if currentResults[0].Name != "comp1" || currentResults[0].Action != SyncActionCloned {
+		t.Errorf("First result incorrect: %+v", currentResults[0])
 	}
 
-	if results.Results[1].Name != "comp2" || results.Results[1].Action != SyncActionUpdated {
-		t.Errorf("Second result incorrect: %+v", results.Results[1])
+	if currentResults[1].Name != "comp2" || currentResults[1].Action != SyncActionUpdated {
+		t.Errorf("Second result incorrect: %+v", currentResults[1])
 	}
 
-	if results.Results[2].Name != "comp3" || results.Results[2].Action != SyncActionFailed {
-		t.Errorf("Third result incorrect: %+v", results.Results[2])
+	if currentResults[2].Name != "comp3" || currentResults[2].Action != SyncActionFailed {
+		t.Errorf("Third result incorrect: %+v", currentResults[2])
+	}
+}
+
+func TestSyncResultsInProgress(t *testing.T) {
+	results := &SyncResults{}
+
+	// Set component as in-progress
+	results.SetInProgress("comp1")
+
+	currentResults := results.GetResults()
+	if len(currentResults) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(currentResults))
+	}
+
+	if !currentResults[0].InProgress {
+		t.Errorf("Expected component to be in progress")
+	}
+
+	// Update result
+	results.UpdateResult("comp1", SyncActionCloned, "v1.0.0", nil)
+
+	currentResults = results.GetResults()
+	if currentResults[0].InProgress {
+		t.Errorf("Expected component to no longer be in progress")
+	}
+
+	if currentResults[0].Action != SyncActionCloned {
+		t.Errorf("Expected action to be '%s', got '%s'", SyncActionCloned, currentResults[0].Action)
+	}
+
+	if currentResults[0].Version != "v1.0.0" {
+		t.Errorf("Expected version 'v1.0.0', got '%s'", currentResults[0].Version)
 	}
 }
 

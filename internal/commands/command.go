@@ -8,6 +8,11 @@ import (
 	"flag"
 )
 
+// Common key bindings.
+const (
+	KeyCtrlC = "ctrl+c"
+)
+
 // Command is an implementation of a godep command
 // like godep save or godep go.
 type Command struct {
