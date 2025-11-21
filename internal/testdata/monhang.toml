@@ -20,13 +20,3 @@ description = "Utility functions"
 source = "git://github.com/monhang/plugin.git?version=v3.0.1&type=git"
 name = "plugin"
 description = "Plugin system"
-
-[[deps.build]]
-name = "lib1"
-version = "v1.0.0"
-repo = "example.git"
-
-[[deps.build]]
-name = "lib2"
-version = "v2.0.2"
-repo = "example.git"

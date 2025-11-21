@@ -41,18 +41,10 @@ func runBoot(_ *Command, _ []string) {
 
 	logging.GetLogger("bootstrap").Info().Str("project", proj.Name).Str("version", proj.Version).Msg("Project loaded")
 
-	// Process and sort dependencies
-	proj.ProcessDeps()
-	proj.Sort()
-
-	// Fetch all dependencies
-	logging.GetLogger("bootstrap").Info().Msg("Fetching dependencies...")
-	fetchedCount := 0
-	proj.ForEach(func(comp *components.ComponentRef) {
-		comp.Fetch()
-		fetchedCount++
-	})
-	logging.GetLogger("bootstrap").Info().Int("count", fetchedCount).Msg("All dependencies fetched successfully")
+	// Fetch the main component
+	logging.GetLogger("bootstrap").Info().Msg("Fetching component...")
+	proj.Fetch()
+	logging.GetLogger("bootstrap").Info().Msg("Component fetched successfully")
 }
 
 func init() {

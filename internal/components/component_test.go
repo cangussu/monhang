@@ -63,19 +63,6 @@ func validateProjectConfig(t *testing.T, proj *Project) {
 		t.Errorf("Expected repoconfig base 'git@github.com:monhang/', got '%s'", proj.Repoconfig.Base)
 	}
 
-	if len(proj.Deps.Build) != 2 {
-		t.Errorf("Expected 2 build dependencies, got %d", len(proj.Deps.Build))
-	}
-
-	if len(proj.Deps.Build) > 0 {
-		if proj.Deps.Build[0].Name != "lib1" {
-			t.Errorf("Expected first dep name 'lib1', got '%s'", proj.Deps.Build[0].Name)
-		}
-		if proj.Deps.Build[0].Version != "v1.0.0" {
-			t.Errorf("Expected first dep version 'v1.0.0', got '%s'", proj.Deps.Build[0].Version)
-		}
-	}
-
 	// Validate components
 	if len(proj.Components) != 2 {
 		t.Errorf("Expected 2 components, got %d", len(proj.Components))
