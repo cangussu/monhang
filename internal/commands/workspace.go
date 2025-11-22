@@ -302,7 +302,7 @@ func handleWorkspaceSync(filename string) {
 	allComponents := flattenComponents(proj.Components)
 
 	// Run interactive sync
-	if err := runInteractiveSync(filename, allComponents, results); err != nil {
+	if err := RunInteractiveSync(filename, allComponents, results); err != nil {
 		fmt.Printf("Error running interactive sync: %v\n", err)
 		os.Exit(1)
 	}
@@ -477,8 +477,8 @@ func (m syncModel) View() string {
 	return s.String()
 }
 
-// runInteractiveSync runs sync operation in interactive mode.
-func runInteractiveSync(filename string, comps []components.Component, results *SyncResults) error {
+// RunInteractiveSync runs sync operation in interactive mode.
+func RunInteractiveSync(filename string, comps []components.Component, results *SyncResults) error {
 	// Check if we have a TTY
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
 		// Fall back to non-interactive mode

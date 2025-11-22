@@ -130,8 +130,8 @@ func getRepoStatus(ctx context.Context, dir string) string {
 	return fmt.Sprintf("%d changes", len(lines))
 }
 
-// isGitRepository checks if the given directory is a git repository.
-func isGitRepository(dir string) bool {
+// IsGitRepository checks if the given directory is a git repository.
+func IsGitRepository(dir string) bool {
 	gitDir := filepath.Join(dir, ".git")
 	info, err := os.Stat(gitDir)
 	if err != nil {
@@ -557,8 +557,8 @@ func (m gitModel) View() string {
 	return m.renderGitRepoList(styles)
 }
 
-// runGitInteractive runs git operation in interactive mode.
-func runGitInteractive(repos []components.ComponentRef, executor *GitExecutor, operation string, execFunc func()) error {
+// RunGitInteractive runs git operation in interactive mode.
+func RunGitInteractive(repos []components.ComponentRef, executor *GitExecutor, operation string, execFunc func()) error {
 	// Start execution in background
 	go execFunc()
 
@@ -577,8 +577,8 @@ func runGitInteractive(repos []components.ComponentRef, executor *GitExecutor, o
 	return nil
 }
 
-// printGitTable prints the git results in a nice table format.
-func printGitTable(repos []components.ComponentRef, results map[string]*GitResult, operation string) {
+// PrintGitTable prints the git results in a nice table format.
+func PrintGitTable(repos []components.ComponentRef, results map[string]*GitResult, operation string) {
 	styles := getGitUIStyles()
 
 	fmt.Println(styles.title.Render(" Git: " + operation + " "))
@@ -673,13 +673,13 @@ func runGitOperation(repos []components.ComponentRef, parallel bool, opFunc func
 // executeGitSubcommand runs a git subcommand either interactively or non-interactively.
 func executeGitSubcommand(repos []components.ComponentRef, executor *GitExecutor, operation string, execFunc func()) {
 	if *gitInteractive {
-		if err := runGitInteractive(repos, executor, operation, execFunc); err != nil {
+		if err := RunGitInteractive(repos, executor, operation, execFunc); err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
 	} else {
 		execFunc()
-		printGitTable(repos, executor.GetResults(), operation)
+		PrintGitTable(repos, executor.GetResults(), operation)
 	}
 }
 
@@ -777,7 +777,7 @@ func runGit(_ *Command, args []string) {
 	proj, err := components.ParseProjectFile(*gitF)
 	if err != nil {
 		// If config file doesn't exist, check if current directory is a git repo
-		if isGitRepository(".") {
+		if IsGitRepository(".") {
 			logging.GetLogger("git").Debug().Msg("No config file found, using current directory as git repository")
 			// Create a minimal project with just the current directory
 			// Use "." as the name so getRepos() will find it in the current directory

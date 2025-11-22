@@ -390,8 +390,8 @@ func (m model) View() string {
 	return m.renderRepoList(styles)
 }
 
-// runInteractiveMode starts command execution in interactive mode with bubbletea UI.
-func runInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor, command string, parallel bool) error {
+// RunInteractiveMode starts command execution in interactive mode with bubbletea UI.
+func RunInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor, command string, parallel bool) error {
 	ctx := context.Background()
 
 	// Start all executions
@@ -461,8 +461,8 @@ func runNonInteractiveMode(repos []components.ComponentRef, executor *RepoExecut
 	}
 }
 
-// printResults prints the execution results for all repos.
-func printResults(repos []components.ComponentRef, results map[string]*RepoResult) int {
+// PrintResults prints the execution results for all repos.
+func PrintResults(repos []components.ComponentRef, results map[string]*RepoResult) int {
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("EXECUTION RESULTS")
 	fmt.Println(strings.Repeat("=", 80))
@@ -538,7 +538,7 @@ func runExec(_ *Command, args []string) {
 	// Interactive mode with bubbletea
 	if *execInteractive {
 		logging.GetLogger("exec").Debug().Msg("Running in interactive mode")
-		if err := runInteractiveMode(repos, executor, command, *execParallel); err != nil {
+		if err := RunInteractiveMode(repos, executor, command, *execParallel); err != nil {
 			logging.GetLogger("exec").Error().Err(err).Msg("Interactive mode failed")
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
@@ -550,7 +550,7 @@ func runExec(_ *Command, args []string) {
 	runNonInteractiveMode(repos, executor, command, *execParallel)
 
 	// Print results
-	failCount := printResults(repos, executor.GetResults())
+	failCount := PrintResults(repos, executor.GetResults())
 
 	logging.GetLogger("exec").Info().
 		Int("total", len(repos)).

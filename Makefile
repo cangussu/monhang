@@ -6,7 +6,7 @@ DIST_DIR=dist
 CMD_PATH=./cmd/monhang
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
-LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
+LDFLAGS=-ldflags "-X github.com/cangussu/monhang/cmd/monhang/cmd.Version=$(VERSION)"
 
 # Default target
 all: fmt vet lint test build
