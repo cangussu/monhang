@@ -14,24 +14,14 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/cangussu/monhang/internal/logging"
-	"github.com/twmb/algoimpl/go/graph"
 )
 
 // ComponentRef is the configuration block that references a component.
 type ComponentRef struct {
 	Repoconfig *RepoConfig `json:"repoconfig" toml:"repoconfig"`
-	node       graph.Node
-	Name       string `json:"name" toml:"name"`
-	Version    string `json:"version" toml:"version"`
-	Repo       string `json:"repo" toml:"repo"`
-}
-
-// Dependency is the configuration block that defines a dependency.
-// There are three types of dependencies: build, runtime and install.
-type Dependency struct {
-	Build   []ComponentRef `json:"build" toml:"build"`
-	Runtime []ComponentRef `json:"runtime" toml:"runtime"`
-	Intall  []ComponentRef `json:"install" toml:"install"`
+	Name       string      `json:"name" toml:"name"`
+	Version    string      `json:"version" toml:"version"`
+	Repo       string      `json:"repo" toml:"repo"`
 }
 
 // RepoConfig defines the configuration for a repository.
@@ -52,10 +42,7 @@ type Component struct {
 // Project is the toplevel struct that represents a configuration file.
 type Project struct {
 	ComponentRef
-	Deps       Dependency
 	Components []Component `json:"components,omitempty" toml:"components,omitempty"`
-	graph      *graph.Graph
-	sorted     []graph.Node
 }
 
 var git = func(args []string) {
@@ -128,79 +115,4 @@ func CreateLocalProject(name string) *Project {
 		},
 	}
 	return proj
-}
-
-// ForEach iterates over each ComponentRef in the project.
-func (proj *Project) ForEach(fn func(*ComponentRef)) {
-	for _, node := range proj.sorted {
-		if node.Value == nil {
-			continue
-		}
-		comp, ok := (*node.Value).(ComponentRef)
-		if !ok {
-			logging.GetLogger("component").Warn().Msg("Skipping non-monhang.ComponentRef node")
-			continue
-		}
-		fn(&comp)
-	}
-}
-
-// ProcessDeps builds the dependency graph for the project.
-func (proj *Project) ProcessDeps() {
-	proj.graph = graph.New(graph.Directed)
-	proj.node = proj.graph.MakeNode()
-	*proj.node.Value = proj
-
-	logging.GetLogger("component").Debug().Str("project", proj.Name).Msg("Processing project dependencies")
-
-	// Build the dependency graph
-	for _, dep := range proj.Deps.Build {
-		logging.GetLogger("component").Debug().Str("dependency", dep.Name).Str("type", "build").Msg("Processing dependency")
-
-		// Set repoconfig if not specified
-		if dep.Repoconfig == nil {
-			logging.GetLogger("component").Debug().
-				Str("dependency", dep.Name).
-				Str("base", proj.Repoconfig.Base).
-				Msg("Adding toplevel repoconfig to dependency")
-			dep.Repoconfig = proj.Repoconfig
-		}
-
-		// Create dependency edge
-		dep.node = proj.graph.MakeNode()
-		*dep.node.Value = dep
-		if err := proj.graph.MakeEdge(proj.node, dep.node); err != nil {
-			logging.GetLogger("component").Error().Err(err).Str("dependency", dep.Name).Msg("Failed to create edge")
-		}
-	}
-
-	// Process runtime dependencies
-	for _, dep := range proj.Deps.Runtime {
-		logging.GetLogger("component").Debug().Str("dependency", dep.Name).Str("type", "runtime").Msg("Processing dependency")
-
-		// Set repoconfig if not specified
-		if dep.Repoconfig == nil {
-			logging.GetLogger("component").Debug().
-				Str("dependency", dep.Name).
-				Str("base", proj.Repoconfig.Base).
-				Msg("Adding toplevel repoconfig to dependency")
-			dep.Repoconfig = proj.Repoconfig
-		}
-
-		// Create dependency edge
-		dep.node = proj.graph.MakeNode()
-		*dep.node.Value = &dep
-		if err := proj.graph.MakeEdge(proj.node, dep.node); err != nil {
-			logging.GetLogger("component").Error().Err(err).Str("dependency", dep.Name).Msg("Failed to create edge")
-		}
-	}
-
-	logging.GetLogger("component").Debug().Str("project", proj.Name).Int("total_deps", len(proj.Deps.Build)+len(proj.Deps.Runtime)).Msg("Finished processing dependencies")
-}
-
-// Sort iterates all build dependencies.
-func (proj *Project) Sort() {
-	logging.GetLogger("component").Debug().Str("project", proj.Name).Msg("Sorting project dependencies")
-	proj.sorted = proj.graph.TopologicalSort()
-	logging.GetLogger("component").Debug().Str("project", proj.Name).Int("sorted_count", len(proj.sorted)).Msg("Dependencies sorted")
 }

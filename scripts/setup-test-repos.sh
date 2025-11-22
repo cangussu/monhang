@@ -150,29 +150,7 @@ cat > "${TEST_DIR}/monhang.json" <<EOF
       "name": "app-frontend",
       "description": "Frontend application"
     }
-  ],
-
-  "deps": {
-    "build": [
-      {
-        "name": "lib-utils",
-        "version": "v1.0.0",
-        "repo": "lib-utils.git"
-      },
-      {
-        "name": "lib-core",
-        "version": "v1.0.0",
-        "repo": "lib-core.git"
-      }
-    ],
-    "runtime": [
-      {
-        "name": "lib-network",
-        "version": "v1.0.0",
-        "repo": "lib-network.git"
-      }
-    ]
-  }
+  ]
 }
 EOF
 
@@ -212,21 +190,6 @@ description = "Backend application"
 source = "file://${REPOS_DIR}/app-frontend.git?version=v1.0.0&type=git"
 name = "app-frontend"
 description = "Frontend application"
-
-[[deps.build]]
-name = "lib-utils"
-version = "v1.0.0"
-repo = "lib-utils.git"
-
-[[deps.build]]
-name = "lib-core"
-version = "v1.0.0"
-repo = "lib-core.git"
-
-[[deps.runtime]]
-name = "lib-network"
-version = "v1.0.0"
-repo = "lib-network.git"
 EOF
 
 echo -e "  ${GREEN}✓${NC} Created monhang.toml"

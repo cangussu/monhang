@@ -523,11 +523,7 @@ func runExec(_ *Command, args []string) {
 	}
 
 	// Build list of repos
-	proj.ProcessDeps()
 	repos := []components.ComponentRef{proj.ComponentRef}
-	repos = append(repos, proj.Deps.Build...)
-	repos = append(repos, proj.Deps.Runtime...)
-	repos = append(repos, proj.Deps.Intall...)
 
 	if len(repos) == 0 {
 		logging.GetLogger("exec").Warn().Msg("No repositories found in configuration")

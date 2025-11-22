@@ -634,9 +634,6 @@ func printGitTable(repos []components.ComponentRef, results map[string]*GitResul
 // getRepos returns list of all repos from project.
 func getRepos(proj *components.Project) []components.ComponentRef {
 	repos := []components.ComponentRef{proj.ComponentRef}
-	repos = append(repos, proj.Deps.Build...)
-	repos = append(repos, proj.Deps.Runtime...)
-	repos = append(repos, proj.Deps.Intall...)
 
 	// Filter out repos that don't exist
 	var existing []components.ComponentRef
@@ -791,7 +788,6 @@ func runGit(_ *Command, args []string) {
 		}
 	}
 
-	proj.ProcessDeps()
 	repos := getRepos(proj)
 
 	if len(repos) == 0 {
