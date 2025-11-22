@@ -2,34 +2,42 @@
 // Use of this source code is governed by a GNU General Public License
 // version 3 that can be found in the LICENSE file.
 
-package commands
+package cmd
 
 import (
 	"github.com/cangussu/monhang/internal/components"
 	"github.com/cangussu/monhang/internal/logging"
+	"github.com/spf13/cobra"
 )
 
-// CmdBoot is the boot command for bootstrapping a workspace.
-var CmdBoot = &Command{
-	Name:  "boot",
-	Args:  "[configfile]",
-	Short: "bootstrap a component and its dependencies",
-	Long: `
-Boot fetches and setups the workspace for the component described in the given configuration file.
-`,
+var bootConfigFile string
+
+// bootCmd represents the boot command.
+var bootCmd = &cobra.Command{
+	Use:   "boot [configfile]",
+	Short: "Bootstrap a component and its dependencies",
+	Long: `Boot fetches and sets up the workspace for the component described in the given configuration file.
+
+Examples:
+  monhang boot
+  monhang boot -f custom-config.json
+  monhang boot path/to/monhang.json`,
+	Run: runBoot,
 }
 
-var bootF = CmdBoot.Flag.String("f", "<defaultconfig>", "configuration file")
+func init() {
+	rootCmd.AddCommand(bootCmd)
+	bootCmd.Flags().StringVarP(&bootConfigFile, "file", "f", "./monhang.json", "configuration file")
+}
 
-func getFilename() string {
-	if *bootF != "<defaultconfig>" {
-		return *bootF
+func runBoot(cmd *cobra.Command, args []string) {
+	filename := bootConfigFile
+
+	// If a positional argument is provided, use that instead
+	if len(args) > 0 {
+		filename = args[0]
 	}
-	return "./monhang.json"
-}
 
-func runBoot(_ *Command, _ []string) {
-	filename := getFilename()
 	logging.GetLogger("bootstrap").Info().Str("config", filename).Msg("Starting bootstrap process")
 
 	// Parse the toplevel project file
@@ -45,8 +53,4 @@ func runBoot(_ *Command, _ []string) {
 	logging.GetLogger("bootstrap").Info().Msg("Fetching component...")
 	proj.Fetch()
 	logging.GetLogger("bootstrap").Info().Msg("Component fetched successfully")
-}
-
-func init() {
-	CmdBoot.Run = runBoot // break init loop
 }

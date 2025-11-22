@@ -20,86 +20,9 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"os"
-	"strings"
-
-	"github.com/cangussu/monhang/internal/commands"
-	"github.com/cangussu/monhang/internal/logging"
+	"github.com/cangussu/monhang/cmd/monhang/cmd"
 )
-
-var (
-	debugFlag = flag.Bool("debug", false, "Enable debug logging")
-)
-
-func setupLog() {
-	// Check for debug mode from environment variable or CLI flag
-	debug := *debugFlag || strings.ToLower(os.Getenv("MONHANG_DEBUG")) == "true"
-
-	// Initialize zerolog
-	logging.Initialize(debug, os.Stderr)
-}
-
-func version() {
-	fmt.Println("monhang v0.0.1")
-}
-
-func usageExit() {
-	version()
-	fmt.Println(`Usage:
-
-	monhang command [arguments]
-
-The commands are:
-
-	boot        bootstraps a workspace
-	exec        run arbitrary commands inside each repo
-	git         run git operations across all repos
-	workspace   manage workspace components (alias: ws)
-	version     print monhang version
-
-Use "monhang help [command]" for more information about a command.`)
-	os.Exit(0)
-}
-
-var cmdHelp = &commands.Command{
-	Name: "help",
-	Run: func(_ *commands.Command, _ []string) {
-		// TODO(cangussu): print the help for the command given in args
-		usageExit()
-	},
-}
-
-var cmds = []*commands.Command{
-	commands.CmdBoot,
-	commands.CmdExec,
-	commands.CmdGit,
-	commands.CmdWorkspace,
-	commands.CmdWs,
-	cmdHelp,
-}
 
 func main() {
-	flag.Usage = usageExit
-	flag.Parse()
-
-	// Setup logging after parsing flags
-	setupLog()
-
-	args := flag.Args()
-	if len(args) < 1 {
-		fmt.Println("You must tell monhang what to do!")
-		usageExit()
-	}
-
-	for _, cmd := range cmds {
-		if cmd.Name == args[0] {
-			if err := cmd.Flag.Parse(args[1:]); err != nil {
-				fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
-				os.Exit(1)
-			}
-			cmd.Run(cmd, cmd.Flag.Args())
-		}
-	}
+	cmd.Execute()
 }

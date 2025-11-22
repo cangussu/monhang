@@ -4,42 +4,7 @@
 
 package commands
 
-import (
-	"flag"
-)
-
 // Common key bindings.
 const (
 	KeyCtrlC = "ctrl+c"
 )
-
-// Command is an implementation of a godep command
-// like godep save or godep go.
-type Command struct {
-	// Run runs the command.
-	// The args are the arguments after the command name.
-	Run func(cmd *Command, args []string)
-
-	// Flag is a set of flags specific to this command.
-	Flag flag.FlagSet
-
-	// Name of the command
-	Name string
-
-	// Args the command would expect
-	Args string
-
-	// Short is the short description shown in the 'godep help' output.
-	Short string
-
-	// Long is the long message shown in the
-	// 'godep help <this-command>' output.
-	Long string
-}
-
-// Check panics if there's an error.
-func Check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
