@@ -22,51 +22,6 @@ import (
 	"golang.org/x/term"
 )
 
-// CmdWorkspace is the workspace command for managing workspace components.
-var CmdWorkspace = &Command{
-	Name:  "workspace",
-	Args:  "<subcommand> [args...]",
-	Short: "manage workspace components",
-	Long: `
-Workspace manages components defined in the configuration file.
-
-Subcommands:
-	sync    synchronize workspace components from manifest
-
-Examples:
-	monhang workspace sync
-	monhang ws sync
-
-Options:
-	-f <file>    configuration file (default: ./monhang.json)
-`,
-}
-
-// CmdWs is the alias for CmdWorkspace.
-var CmdWs = &Command{
-	Name:  "ws",
-	Args:  "<subcommand> [args...]",
-	Short: "alias for workspace",
-	Long: `
-Workspace (ws) manages components defined in the configuration file.
-
-Subcommands:
-	sync    synchronize workspace components from manifest
-
-Examples:
-	monhang ws sync
-	monhang workspace sync
-
-Options:
-	-f <file>    configuration file (default: ./monhang.json)
-`,
-}
-
-var (
-	workspaceF = CmdWorkspace.Flag.String("f", "./monhang.json", "configuration file")
-	wsF        = CmdWs.Flag.String("f", "./monhang.json", "configuration file")
-)
-
 // Sync action constants.
 const (
 	SyncActionCloned  = "cloned"
@@ -280,34 +235,6 @@ func getCurrentVersion(name string) string {
 	// Fall back to short commit hash
 	hash, _ := executeGitCmd(name, "rev-parse", "--short", "HEAD")
 	return hash
-}
-
-// handleWorkspaceSync processes the sync subcommand.
-func handleWorkspaceSync(filename string) {
-	logging.GetLogger("workspace").Info().Str("file", filename).Msg("Starting workspace sync")
-
-	proj, err := components.ParseProjectFile(filename)
-	Check(err)
-
-	if len(proj.Components) == 0 {
-		logging.GetLogger("workspace").Info().Msg("No components defined in manifest")
-		fmt.Println("No components defined in manifest")
-		return
-	}
-
-	// Collect results
-	results := &SyncResults{}
-
-	// Collect all components (flatten tree)
-	allComponents := flattenComponents(proj.Components)
-
-	// Run interactive sync
-	if err := RunInteractiveSync(filename, allComponents, results); err != nil {
-		fmt.Printf("Error running interactive sync: %v\n", err)
-		os.Exit(1)
-	}
-
-	logging.GetLogger("workspace").Info().Msg("Workspace sync completed")
 }
 
 // flattenComponents flattens the component tree into a list.
@@ -648,66 +575,4 @@ func getSyncStyles() syncStyles {
 			Foreground(lipgloss.Color("#FFAA00")),
 		normal: lipgloss.NewStyle(),
 	}
-}
-
-func runWorkspace(_ *Command, args []string) {
-	if len(args) == 0 {
-		fmt.Println("Error: No subcommand specified")
-		fmt.Println("Usage: monhang workspace <subcommand> [args]")
-		fmt.Println("\nSubcommands: sync")
-		os.Exit(1)
-	}
-
-	subcommand := args[0]
-
-	logging.GetLogger("workspace").Info().
-		Str("subcommand", subcommand).
-		Msg("Starting workspace command")
-
-	// Execute based on subcommand
-	switch subcommand {
-	case "sync":
-		handleWorkspaceSync(*workspaceF)
-	default:
-		logging.GetLogger("workspace").Error().Str("subcommand", subcommand).Msg("Unknown workspace subcommand")
-		fmt.Printf("Error: Unknown subcommand '%s'\n", subcommand)
-		fmt.Println("Available subcommands: sync")
-		os.Exit(1)
-	}
-
-	logging.GetLogger("workspace").Info().Str("subcommand", subcommand).Msg("Workspace command completed")
-}
-
-func runWs(_ *Command, args []string) {
-	if len(args) == 0 {
-		fmt.Println("Error: No subcommand specified")
-		fmt.Println("Usage: monhang ws <subcommand> [args]")
-		fmt.Println("\nSubcommands: sync")
-		os.Exit(1)
-	}
-
-	subcommand := args[0]
-
-	logging.GetLogger("workspace").Info().
-		Str("subcommand", subcommand).
-		Str("alias", "ws").
-		Msg("Starting workspace command (via ws alias)")
-
-	// Execute based on subcommand
-	switch subcommand {
-	case "sync":
-		handleWorkspaceSync(*wsF)
-	default:
-		logging.GetLogger("workspace").Error().Str("subcommand", subcommand).Msg("Unknown workspace subcommand")
-		fmt.Printf("Error: Unknown subcommand '%s'\n", subcommand)
-		fmt.Println("Available subcommands: sync")
-		os.Exit(1)
-	}
-
-	logging.GetLogger("workspace").Info().Str("subcommand", subcommand).Msg("Workspace command completed (via ws alias)")
-}
-
-func init() {
-	CmdWorkspace.Run = runWorkspace
-	CmdWs.Run = runWs
 }

@@ -10,7 +10,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -21,34 +20,6 @@ import (
 	"github.com/cangussu/monhang/internal/logging"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-)
-
-// CmdExec is the exec command for running arbitrary commands in each repo.
-var CmdExec = &Command{
-	Name:  "exec",
-	Args:  "[command...]",
-	Short: "run arbitrary commands inside each repo",
-	Long: `
-Exec runs arbitrary commands inside each repository defined in the configuration file.
-
-Examples:
-	monhang exec -- git status
-	monhang exec -p -- make build
-	monhang exec -i -- npm test
-
-Options:
-	-f <file>    configuration file (default: ./monhang.json)
-	-p           run commands in parallel
-	-i           interactive mode with bubbletea UI
-	-l           show live progress (non-interactive)
-`,
-}
-
-var (
-	execF           = CmdExec.Flag.String("f", "./monhang.json", "configuration file")
-	execParallel    = CmdExec.Flag.Bool("p", false, "run in parallel")
-	execInteractive = CmdExec.Flag.Bool("i", false, "interactive mode")
-	execLive        = CmdExec.Flag.Bool("l", false, "show live progress")
 )
 
 // RepoResult holds the result of running a command in a repo.
@@ -434,33 +405,6 @@ func RunInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor,
 	return nil
 }
 
-// runNonInteractiveMode executes commands in non-interactive mode.
-func runNonInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor, command string, parallel bool) {
-	ctx := context.Background()
-
-	if parallel {
-		logging.GetLogger("exec").Info().Int("repo_count", len(repos)).Msg("Executing commands in parallel")
-		var wg sync.WaitGroup
-		for _, repo := range repos {
-			wg.Add(1)
-			go func(r components.ComponentRef) {
-				defer wg.Done()
-				path := filepath.Join(".", r.Name)
-				logging.GetLogger("exec").Info().Str("repo", r.Name).Str("command", command).Msg("Executing command")
-				executor.ExecuteCommand(ctx, r.Name, path, command)
-			}(repo)
-		}
-		wg.Wait()
-	} else {
-		logging.GetLogger("exec").Info().Int("repo_count", len(repos)).Msg("Executing commands sequentially")
-		for _, repo := range repos {
-			path := filepath.Join(".", repo.Name)
-			logging.GetLogger("exec").Info().Str("repo", repo.Name).Str("command", command).Msg("Executing command")
-			executor.ExecuteCommand(ctx, repo.Name, path, command)
-		}
-	}
-}
-
 // PrintResults prints the execution results for all repos.
 func PrintResults(repos []components.ComponentRef, results map[string]*RepoResult) int {
 	fmt.Println("\n" + strings.Repeat("=", 80))
@@ -499,70 +443,4 @@ func PrintResults(repos []components.ComponentRef, results map[string]*RepoResul
 
 	fmt.Printf("\n\nSummary: %d succeeded, %d failed\n", successCount, failCount)
 	return failCount
-}
-
-func runExec(_ *Command, args []string) {
-	if len(args) == 0 {
-		fmt.Println("Error: No command specified")
-		fmt.Println("Usage: monhang exec [flags] -- <command>")
-		os.Exit(1)
-	}
-
-	command := strings.Join(args, " ")
-	logging.GetLogger("exec").Info().
-		Str("command", command).
-		Bool("parallel", *execParallel).
-		Bool("interactive", *execInteractive).
-		Msg("Starting exec command")
-
-	// Parse the configuration file
-	proj, err := components.ParseProjectFile(*execF)
-	if err != nil {
-		logging.GetLogger("exec").Error().Err(err).Str("filename", *execF).Msg("Failed to parse project file")
-		Check(err)
-	}
-
-	// Build list of repos
-	repos := []components.ComponentRef{proj.ComponentRef}
-
-	if len(repos) == 0 {
-		logging.GetLogger("exec").Warn().Msg("No repositories found in configuration")
-		fmt.Println("No repositories found in configuration")
-		return
-	}
-
-	logging.GetLogger("exec").Debug().Int("repo_count", len(repos)).Msg("Repositories loaded")
-
-	executor := NewRepoExecutor(*execLive && !*execInteractive)
-
-	// Interactive mode with bubbletea
-	if *execInteractive {
-		logging.GetLogger("exec").Debug().Msg("Running in interactive mode")
-		if err := RunInteractiveMode(repos, executor, command, *execParallel); err != nil {
-			logging.GetLogger("exec").Error().Err(err).Msg("Interactive mode failed")
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	// Non-interactive mode
-	runNonInteractiveMode(repos, executor, command, *execParallel)
-
-	// Print results
-	failCount := PrintResults(repos, executor.GetResults())
-
-	logging.GetLogger("exec").Info().
-		Int("total", len(repos)).
-		Int("failed", failCount).
-		Int("succeeded", len(repos)-failCount).
-		Msg("Execution summary")
-
-	if failCount > 0 {
-		os.Exit(1)
-	}
-}
-
-func init() {
-	CmdExec.Run = runExec // break init loop
 }
