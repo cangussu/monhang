@@ -88,6 +88,14 @@ func TestValidateJSON_Valid(t *testing.T) {
 			json: `{"name": "test", "source": "ssh://git@github.com/org/repo.git"}`,
 		},
 		{
+			name: "SSH git format (git@host:path)",
+			json: `{"name": "test", "source": "git@github.com:monhang/monhang.git"}`,
+		},
+		{
+			name: "SSH git format with query params",
+			json: `{"name": "test", "source": "git@github.com:monhang/monhang.git?version=v1.0.0"}`,
+		},
+		{
 			name: "empty components array",
 			json: `{"name": "test", "components": []}`,
 		},
@@ -109,11 +117,6 @@ func TestValidateJSON_Invalid(t *testing.T) {
 		json          string
 		expectedError string
 	}{
-		{
-			name:          "missing required field name",
-			json:          `{"version": "1.0.0"}`,
-			expectedError: "missing property",
-		},
 		{
 			name:          "invalid source URL no scheme",
 			json:          `{"name": "test", "source": "github.com/org/repo"}`,
@@ -153,11 +156,6 @@ func TestValidateJSON_Invalid(t *testing.T) {
 			name:          "wrong type for components",
 			json:          `{"name": "test", "components": "not-an-array"}`,
 			expectedError: "want array",
-		},
-		{
-			name:          "nested component missing name",
-			json:          `{"name": "parent", "components": [{"source": "git://github.com/org/repo.git"}]}`,
-			expectedError: "missing property",
 		},
 	}
 
@@ -207,6 +205,13 @@ source = "https://github.com/org/child.git"
 name = "child2"
 `,
 		},
+		{
+			name: "SSH git format source",
+			toml: `
+name = "test-component"
+source = "git@github.com:monhang/monhang.git"
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -225,11 +230,6 @@ func TestValidateTOML_Invalid(t *testing.T) {
 		toml          string
 		expectedError string
 	}{
-		{
-			name:          "missing required field name",
-			toml:          `version = "1.0.0"`,
-			expectedError: "missing property",
-		},
 		{
 			name: "invalid source URL",
 			toml: `name = "test"
@@ -269,11 +269,11 @@ func TestFormatValidationError(t *testing.T) {
 	}
 
 	// Test with validation error containing helpful messages
-	jsonData := []byte(`{"version": "1.0.0"}`) // missing name
+	jsonData := []byte(`{"name": "test", "version": "invalid"}`) // invalid version format
 	validationErr := ValidateJSON(jsonData)
 
 	if validationErr == nil {
-		t.Fatal("Expected validation error for missing name")
+		t.Fatal("Expected validation error for invalid version format")
 	}
 
 	errorMsg := validationErr.Error()

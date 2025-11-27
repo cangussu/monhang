@@ -420,7 +420,6 @@ func (m syncModel) View() string {
 	// Print table header
 	headerLine := fmt.Sprintf("%-30s %-15s %-20s", "Component", "Status", "Version")
 	s.WriteString(styles.header.Render(headerLine) + "\n")
-	s.WriteString(strings.Repeat("-", 70) + "\n")
 
 	// Print each result
 	for _, r := range currentResults {
@@ -540,30 +539,31 @@ func runNonInteractiveSync(filename string, comps []*components.Component, resul
 
 	// Sync all components sequentially
 	for _, comp := range comps {
-		fmt.Printf("- %s... ", comp.Name)
-		results.SetInProgress(comp.Name)
+		name := comp.GetName()
+		fmt.Printf("- %s... ", name)
+		results.SetInProgress(name)
 
 		repoURL, version, _ := parseSourceURL(comp.Source)
 
-		if componentExists(comp.Name) {
-			action, err := updateComponent(comp.Name, version)
+		if componentExists(name) {
+			action, err := updateComponent(name, version)
 			if err != nil {
 				fmt.Printf("%s\n", styles.errorStyle.Render("failed: "+err.Error()))
-				results.UpdateResult(comp.Name, SyncActionFailed, "", err)
+				results.UpdateResult(name, SyncActionFailed, "", err)
 			} else {
-				currentVer := getCurrentVersion(comp.Name)
+				currentVer := getCurrentVersion(name)
 				fmt.Printf("%s (%s)\n", styles.success.Render(action), currentVer)
-				results.UpdateResult(comp.Name, action, currentVer, nil)
+				results.UpdateResult(name, action, currentVer, nil)
 			}
 		} else {
-			err := cloneComponent(comp.Name, repoURL, version)
+			err := cloneComponent(name, repoURL, version)
 			if err != nil {
 				fmt.Printf("%s\n", styles.errorStyle.Render("failed: "+err.Error()))
-				results.UpdateResult(comp.Name, SyncActionFailed, "", err)
+				results.UpdateResult(name, SyncActionFailed, "", err)
 			} else {
-				currentVer := getCurrentVersion(comp.Name)
+				currentVer := getCurrentVersion(name)
 				fmt.Printf("%s (%s)\n", styles.success.Render("cloned"), currentVer)
-				results.UpdateResult(comp.Name, SyncActionCloned, currentVer, nil)
+				results.UpdateResult(name, SyncActionCloned, currentVer, nil)
 			}
 		}
 	}
@@ -608,34 +608,36 @@ func printNonInteractiveSummary(results *SyncResults) {
 
 // syncComponentBackground synchronizes a component in the background.
 func syncComponentBackground(comp *components.Component, results *SyncResults) {
+	name := comp.GetName()
+
 	logging.GetLogger("workspace").Debug().
-		Str("name", comp.Name).
+		Str("name", name).
 		Str("source", comp.Source).
 		Msg("Processing component in background")
 
 	// Mark as in-progress
-	results.SetInProgress(comp.Name)
+	results.SetInProgress(name)
 
 	// Parse source URL
 	repoURL, version, _ := parseSourceURL(comp.Source)
 
-	if componentExists(comp.Name) {
+	if componentExists(name) {
 		// Component exists - try to update
-		action, err := updateComponent(comp.Name, version)
+		action, err := updateComponent(name, version)
 		if err != nil {
-			results.UpdateResult(comp.Name, SyncActionFailed, "", err)
+			results.UpdateResult(name, SyncActionFailed, "", err)
 		} else {
-			currentVer := getCurrentVersion(comp.Name)
-			results.UpdateResult(comp.Name, action, currentVer, nil)
+			currentVer := getCurrentVersion(name)
+			results.UpdateResult(name, action, currentVer, nil)
 		}
 	} else {
 		// Component missing - clone it
-		err := cloneComponent(comp.Name, repoURL, version)
+		err := cloneComponent(name, repoURL, version)
 		if err != nil {
-			results.UpdateResult(comp.Name, SyncActionFailed, "", err)
+			results.UpdateResult(name, SyncActionFailed, "", err)
 		} else {
-			currentVer := getCurrentVersion(comp.Name)
-			results.UpdateResult(comp.Name, SyncActionCloned, currentVer, nil)
+			currentVer := getCurrentVersion(name)
+			results.UpdateResult(name, SyncActionCloned, currentVer, nil)
 		}
 	}
 }

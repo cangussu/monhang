@@ -4,13 +4,12 @@
   "title": "Monhang Component Manifest",
   "description": "Schema for monhang component configuration files (JSON and TOML formats)",
   "type": "object",
-  "required": ["name"],
   "properties": {
     "name": {
       "type": "string",
-      "description": "Component name (used as directory name)",
+      "description": "Component name (used as directory name). If not provided, derived from the repository URL (e.g., 'repo' for /path/to/repo.git, 'foo' for host.xz:foo/.git)",
       "minLength": 1,
-      "pattern": "^[a-zA-Z0-9_-]+$"
+      "pattern": "^[a-zA-Z0-9_.-]+$"
     },
     "version": {
       "type": "string",
@@ -19,8 +18,8 @@
     },
     "source": {
       "type": "string",
-      "description": "Source repository URL with optional query parameters for version and type",
-      "pattern": "^(git|https?|file|ssh)://.+"
+      "description": "Source repository URL with optional query parameters for version and type. Supports both standard URLs (git://, https://, etc.) and SSH format (git@host:path)",
+      "pattern": "^((git|https?|file|ssh)://.+|git@.+:.+)"
     },
     "description": {
       "type": "string",

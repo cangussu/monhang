@@ -138,6 +138,20 @@ func TestResolveRepo(t *testing.T) {
 			},
 			expected: "",
 		},
+		{
+			name: "SSH format URL should be preserved",
+			comp: Component{
+				Source: "git@github.com:monhang/monhang.git?version=v1.0.0",
+			},
+			expected: "git@github.com:monhang/monhang.git",
+		},
+		{
+			name: "SSH format URL without query params",
+			comp: Component{
+				Source: "git@github.com:monhang/monhang.git",
+			},
+			expected: "git@github.com:monhang/monhang.git",
+		},
 	}
 
 	for _, tt := range tests {
@@ -186,6 +200,22 @@ func TestGetVersion(t *testing.T) {
 				Source: "git://github.com/org/repo.git",
 			},
 			expected: "",
+		},
+		{
+			name: "version from SSH format source URL",
+			comp: Component{
+				Source:  "git@github.com:monhang/monhang.git?version=v1.2.3",
+				Version: "v2.0.0",
+			},
+			expected: "v1.2.3",
+		},
+		{
+			name: "SSH format with no version falls back to Version field",
+			comp: Component{
+				Source:  "git@github.com:monhang/monhang.git",
+				Version: "v3.0.0",
+			},
+			expected: "v3.0.0",
 		},
 	}
 
@@ -239,6 +269,20 @@ func TestGetType(t *testing.T) {
 			comp:     Component{},
 			expected: "git",
 		},
+		{
+			name: "type from SSH format defaults to git",
+			comp: Component{
+				Source: "git@github.com:monhang/monhang.git",
+			},
+			expected: "git",
+		},
+		{
+			name: "type from SSH format with explicit type parameter",
+			comp: Component{
+				Source: "git@github.com:monhang/monhang.git?type=svn",
+			},
+			expected: "svn",
+		},
 	}
 
 	for _, tt := range tests {
@@ -251,6 +295,271 @@ func TestGetType(t *testing.T) {
 	}
 }
 
+//nolint:dupl // Table-driven tests have similar structure but test different scenarios
+func TestDeriveNameFromURL_StandardURLs(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoURL  string
+		expected string
+	}{
+		{
+			name:     "HTTPS URL with .git suffix",
+			repoURL:  "https://github.com/org/repo.git",
+			expected: "repo",
+		},
+		{
+			name:     "HTTPS URL without .git suffix",
+			repoURL:  "https://github.com/org/repo",
+			expected: "repo",
+		},
+		{
+			name:     "URL with trailing slash and .git",
+			repoURL:  "https://github.com/org/repo.git/",
+			expected: "repo",
+		},
+		{
+			name:     "URL with trailing slash without .git",
+			repoURL:  "https://github.com/org/repo/",
+			expected: "repo",
+		},
+		{
+			name:     "file:// URL with .git",
+			repoURL:  "file:///home/user/repos/myrepo.git",
+			expected: "myrepo",
+		},
+		{
+			name:     "file:// URL without .git",
+			repoURL:  "file:///home/user/repos/myrepo",
+			expected: "myrepo",
+		},
+		{
+			name:     "git protocol URL",
+			repoURL:  "git://github.com/org/repo.git",
+			expected: "repo",
+		},
+		{
+			name:     "SSH with port number",
+			repoURL:  "ssh://git@github.com:22/org/repo.git",
+			expected: "repo",
+		},
+		{
+			name:     "complex path with multiple levels",
+			repoURL:  "https://example.com/path/to/deep/repo.git",
+			expected: "repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := deriveNameFromURL(tt.repoURL)
+			if result != tt.expected {
+				t.Errorf("deriveNameFromURL(%q) = %q, expected %q", tt.repoURL, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDeriveNameFromURL_SSHFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoURL  string
+		expected string
+	}{
+		{
+			name:     "SSH format with .git suffix",
+			repoURL:  "git@host.xz:foo/.git",
+			expected: "foo",
+		},
+		{
+			name:     "SSH format without .git suffix",
+			repoURL:  "git@host.xz:foo",
+			expected: "foo",
+		},
+		{
+			name:     "SSH format with nested path and .git",
+			repoURL:  "git@github.com:org/repo.git",
+			expected: "repo",
+		},
+		{
+			name:     "SSH format with nested path without .git",
+			repoURL:  "git@github.com:org/repo",
+			expected: "repo",
+		},
+		{
+			name:     "SSH format with just .git directory",
+			repoURL:  "git@host.xz:.git",
+			expected: "component",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := deriveNameFromURL(tt.repoURL)
+			if result != tt.expected {
+				t.Errorf("deriveNameFromURL(%q) = %q, expected %q", tt.repoURL, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDeriveNameFromURL_SpecialCharacters(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoURL  string
+		expected string
+	}{
+		{
+			name:     "repo name with hyphens",
+			repoURL:  "https://github.com/org/my-repo-name.git",
+			expected: "my-repo-name",
+		},
+		{
+			name:     "repo name with underscores",
+			repoURL:  "https://github.com/org/my_repo_name.git",
+			expected: "my_repo_name",
+		},
+		{
+			name:     "repo name with dots",
+			repoURL:  "https://github.com/org/my.repo.name.git",
+			expected: "my.repo.name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := deriveNameFromURL(tt.repoURL)
+			if result != tt.expected {
+				t.Errorf("deriveNameFromURL(%q) = %q, expected %q", tt.repoURL, result, tt.expected)
+			}
+		})
+	}
+}
+
+//nolint:dupl // Table-driven tests have similar structure but test different scenarios
+func TestDeriveNameFromURL_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoURL  string
+		expected string
+	}{
+		{
+			name:     "empty string returns default",
+			repoURL:  "",
+			expected: "component",
+		},
+		{
+			name:     "just dot returns default",
+			repoURL:  ".",
+			expected: "component",
+		},
+		{
+			name:     "URL ending with only .git",
+			repoURL:  "https://example.com/.git",
+			expected: "component",
+		},
+		{
+			name:     "file path with .git suffix",
+			repoURL:  "/path/to/repo.git",
+			expected: "repo",
+		},
+		{
+			name:     "file path without .git suffix",
+			repoURL:  "/path/to/repo",
+			expected: "repo",
+		},
+		{
+			name:     "relative path with .git",
+			repoURL:  "../repo.git",
+			expected: "repo",
+		},
+		{
+			name:     "current directory relative path",
+			repoURL:  "./repo.git",
+			expected: "repo",
+		},
+		{
+			name:     "Windows-style path",
+			repoURL:  "C:\\Users\\user\\repos\\repo.git",
+			expected: "repo",
+		},
+		{
+			name:     "single word repo",
+			repoURL:  "myrepo",
+			expected: "myrepo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := deriveNameFromURL(tt.repoURL)
+			if result != tt.expected {
+				t.Errorf("deriveNameFromURL(%q) = %q, expected %q", tt.repoURL, result, tt.expected)
+			}
+		})
+	}
+}
+
+//nolint:govet // Component struct field alignment is acceptable for test readability
+func TestGetName(t *testing.T) {
+	tests := []struct {
+		name     string
+		comp     Component
+		expected string
+	}{
+		{
+			name: "explicit name is used",
+			comp: Component{
+				Name:   "explicit-name",
+				Source: "https://github.com/org/repo.git",
+			},
+			expected: "explicit-name",
+		},
+		{
+			name: "name derived from HTTPS source",
+			comp: Component{
+				Source: "https://github.com/org/derived-repo.git",
+			},
+			expected: "derived-repo",
+		},
+		{
+			name: "name derived from SSH source",
+			comp: Component{
+				Source: "git@github.com:org/ssh-repo.git",
+			},
+			expected: "ssh-repo",
+		},
+		{
+			name: "name derived from file source",
+			comp: Component{
+				Source: "file:///path/to/file-repo.git",
+			},
+			expected: "file-repo",
+		},
+		{
+			name:     "default name when no source or name",
+			comp:     Component{},
+			expected: "component",
+		},
+		{
+			name: "empty name uses derived name",
+			comp: Component{
+				Name:   "",
+				Source: "https://github.com/org/derived.git",
+			},
+			expected: "derived",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.comp.GetName()
+			if result != tt.expected {
+				t.Errorf("GetName() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestParseComponentFile_ValidationErrors(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -258,9 +567,9 @@ func TestParseComponentFile_ValidationErrors(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "invalid missing name",
+			name:        "missing name is now valid (derived from source)",
 			filename:    "../testdata/invalid/missing-name.json",
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:        "invalid source URL",
@@ -278,9 +587,9 @@ func TestParseComponentFile_ValidationErrors(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "invalid nested component",
+			name:        "nested component without name is now valid (derived from source)",
 			filename:    "../testdata/invalid/invalid-nested-component.json",
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:        "valid JSON config",

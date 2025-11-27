@@ -28,7 +28,8 @@ const (
 // The top-level manifest is itself a Component.
 //
 // The Source URL encodes both the repository location and metadata:
-// - Schema determines the type: git://, https://, file:// all indicate git repositories
+// - Schema determines the type: git://, https://, file://, ssh:// all indicate git repositories
+// - SSH format (git@host:path) is also supported for git repositories
 // - Query parameter ?type=<type> can override the schema-based type detection
 // - Query parameter ?version=<version> specifies the version/tag/branch
 // - Default type is "git" if not specified
@@ -37,9 +38,10 @@ const (
 //   - git://github.com/org/repo.git?version=v1.0.0
 //   - https://github.com/org/repo.git?version=main
 //   - file:///path/to/local/repo.git?version=v2.0.0
+//   - git@github.com:org/repo.git?version=v1.0.0
 type Component struct {
 	Source      string       `json:"source,omitempty" toml:"source,omitempty"`
-	Name        string       `json:"name" toml:"name"`
+	Name        string       `json:"name,omitempty" toml:"name,omitempty"`
 	Description string       `json:"description,omitempty" toml:"description,omitempty"`
 	Version     string       `json:"version,omitempty" toml:"version,omitempty"`
 	Components  []*Component `json:"components,omitempty" toml:"components,omitempty"`
@@ -55,15 +57,43 @@ func (comp *Component) HasRepo() bool {
 //   - git://github.com/org/repo.git?version=v1.0.0&type=git
 //   - https://github.com/org/repo.git?version=main
 //   - file:///path/to/repo.git?version=v2.0.0
+//   - git@github.com:org/repo.git?version=v1.0.0
 //
 // Returns:
 //   - repoURL: cleaned repository URL suitable for git clone
 //   - version: version/tag/branch to checkout (from ?version param)
 //   - repoType: repository type, determined by:
 //     1. Query parameter ?type=<type> if present
-//     2. URL scheme (git://, https://, file:// → "git")
-//     3. Default: "git"
+//     2. URL scheme (git://, https://, file://, ssh:// → "git")
+//     3. SSH format (git@host:path → "git")
+//     4. Default: "git"
 func parseSourceURL(source string) (repoURL, version, repoType string) {
+	// Handle SSH format (git@host:path)
+	if strings.HasPrefix(source, "git@") {
+		// Split by '?' to separate URL from query parameters
+		parts := strings.SplitN(source, "?", 2)
+		sshURL := parts[0]
+
+		// Parse query parameters if they exist
+		var queryParams url.Values
+		if len(parts) == 2 {
+			var err error
+			queryParams, err = url.ParseQuery(parts[1])
+			if err == nil {
+				version = queryParams.Get("version")
+				repoType = queryParams.Get("type")
+			}
+		}
+
+		// Default type for SSH is git
+		if repoType == "" {
+			repoType = DefaultRepoType
+		}
+
+		// Return the SSH URL as-is (git supports this format natively)
+		return sshURL, version, repoType
+	}
+
 	// Parse the URL
 	u, err := url.Parse(source)
 	if err != nil {
@@ -131,6 +161,70 @@ func (comp *Component) GetType() string {
 
 	_, _, repoType := parseSourceURL(comp.Source)
 	return repoType
+}
+
+// deriveNameFromURL extracts the directory name from a git repository URL.
+// This mimics git's behavior when cloning without specifying a target directory.
+// Examples:
+//   - https://github.com/org/repo.git -> repo
+//   - /path/to/repo.git -> repo
+//   - git@host.xz:foo/.git -> foo
+//   - https://github.com/org/repo -> repo
+func deriveNameFromURL(repoURL string) string {
+	// Remove trailing slashes
+	repoURL = strings.TrimSuffix(repoURL, "/")
+
+	// Extract the last path component
+	var pathPart string
+
+	// Handle SSH format (git@host:path)
+	if strings.Contains(repoURL, "@") && strings.Contains(repoURL, ":") && !strings.Contains(repoURL, "://") {
+		// Split by ':' to get the path part after the colon
+		parts := strings.SplitN(repoURL, ":", 2)
+		if len(parts) == 2 {
+			pathPart = parts[1]
+		}
+	} else {
+		// Handle standard URLs and file paths
+		u, err := url.Parse(repoURL)
+		if err == nil && u.Path != "" {
+			pathPart = u.Path
+		} else {
+			// Fall back to simple path extraction
+			pathPart = repoURL
+		}
+	}
+
+	// Handle both forward and backslashes for cross-platform compatibility
+	pathPart = strings.ReplaceAll(pathPart, "\\", "/")
+
+	// Remove .git suffix from the path (could be directory or file)
+	pathPart = strings.TrimSuffix(pathPart, "/.git")
+	pathPart = strings.TrimSuffix(pathPart, ".git")
+
+	// Get the base name (last component)
+	lastComponent := filepath.Base(pathPart)
+
+	// If we ended up with an empty string or just ".", use a default
+	if lastComponent == "" || lastComponent == "." || lastComponent == "/" {
+		return "component"
+	}
+
+	return lastComponent
+}
+
+// GetName returns the component name, deriving it from the source URL if not specified.
+func (comp *Component) GetName() string {
+	if comp.Name != "" {
+		return comp.Name
+	}
+
+	if comp.Source != "" {
+		repoURL, _, _ := parseSourceURL(comp.Source)
+		return deriveNameFromURL(repoURL)
+	}
+
+	return "component"
 }
 
 // ParseComponentFile parses a component configuration file (JSON or TOML format).
