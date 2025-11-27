@@ -180,6 +180,71 @@ When debug mode is enabled, logs are displayed in a human-readable console forma
 
 By default (quiet mode), only errors and fatal messages are shown.
 
+## Configuration Validation
+
+Monhang automatically validates all configuration files against a JSON Schema when they are loaded. This ensures your configuration is correct and helps catch errors early.
+
+### What is Validated
+
+The schema enforces:
+
+- **Required fields**: Every component must have a `name`
+- **Name format**: Names can only contain letters, numbers, underscores, and hyphens (`^[a-zA-Z0-9_-]+$`)
+- **Source URLs**: Must use valid schemes: `git://`, `https://`, `http://`, `file://`, or `ssh://`
+- **Version format**: Must follow semantic versioning (e.g., `v1.0.0`, `1.0.0`, `1.0.0-beta`)
+- **No typos**: Additional properties not defined in the schema are rejected
+- **Recursive validation**: Nested components are validated with the same rules
+
+### Validation Errors
+
+When validation fails, you'll see a detailed error message:
+
+```
+configuration validation failed:
+  - Field '/name': must contain only letters, numbers, underscores, and hyphens
+```
+
+Common validation errors and fixes:
+
+**Missing required field:**
+```
+Error: Field 'root': missing properties: 'name'
+Fix: Add "name": "your-component-name" to your configuration
+```
+
+**Invalid source URL:**
+```
+Error: Field '/source': must be a valid URL starting with git://, https://, file://, or ssh://
+Fix: Change "source": "github.com/org/repo" to "source": "https://github.com/org/repo.git"
+```
+
+**Invalid name format:**
+```
+Error: Field '/name': must contain only letters, numbers, underscores, and hyphens
+Fix: Change "name": "my component" to "name": "my-component"
+```
+
+### IDE Support
+
+Monhang includes a JSON Schema file that provides autocomplete and validation in your editor.
+
+**VS Code**: Automatically enabled for files matching:
+- `**/monhang.json`
+- `**/monhang-manifest.json`
+- `**/.monhang.json`
+
+You'll get:
+- Autocomplete for field names
+- Inline validation errors
+- Hover documentation
+- Field descriptions
+
+**Other IDEs**: See [schema/README.md](schema/README.md) for configuration instructions.
+
+### Schema Documentation
+
+For complete schema documentation, see [schema/README.md](schema/README.md).
+
 ## Configuration file
 
 A configuration file describes a component and also its dependencies. Configuration

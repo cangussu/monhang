@@ -250,3 +250,59 @@ func TestGetType(t *testing.T) {
 		})
 	}
 }
+
+func TestParseComponentFile_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name        string
+		filename    string
+		expectError bool
+	}{
+		{
+			name:        "invalid missing name",
+			filename:    "../testdata/invalid/missing-name.json",
+			expectError: true,
+		},
+		{
+			name:        "invalid source URL",
+			filename:    "../testdata/invalid/invalid-source-url.json",
+			expectError: true,
+		},
+		{
+			name:        "invalid version format",
+			filename:    "../testdata/invalid/invalid-version-format.json",
+			expectError: true,
+		},
+		{
+			name:        "extra fields",
+			filename:    "../testdata/invalid/extra-fields.json",
+			expectError: true,
+		},
+		{
+			name:        "invalid nested component",
+			filename:    "../testdata/invalid/invalid-nested-component.json",
+			expectError: true,
+		},
+		{
+			name:        "valid JSON config",
+			filename:    "../testdata/monhang.json",
+			expectError: false,
+		},
+		{
+			name:        "valid TOML config",
+			filename:    "../testdata/monhang.toml",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseComponentFile(tt.filename)
+			if tt.expectError && err == nil {
+				t.Error("Expected validation error, got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Expected no error, got: %v", err)
+			}
+		})
+	}
+}

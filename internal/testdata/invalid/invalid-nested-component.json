@@ -1,0 +1,9 @@
+{
+  "name": "parent-component",
+  "components": [
+    {
+      "source": "git://github.com/org/repo.git",
+      "description": "Child without name"
+    }
+  ]
+}

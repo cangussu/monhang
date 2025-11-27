@@ -1,0 +1,79 @@
+# Monhang Configuration Schema
+# This file documents the structure and fields for monhang configuration files.
+#
+# Configuration files can be in TOML or JSON format and define a component
+# hierarchy for workspace management.
+
+# Top-level component (required)
+# This represents the root of your workspace/project
+name = "your-app-name"           # Required: Name of the top-level component
+version = "1.0.0"                # Optional: Version of the component
+source = "git://github.com/org/repo.git?version=v1.0.0"  # Optional: Source repository
+description = "Description"      # Optional: Human-readable description
+
+# Child components (optional)
+# Components form a recursive tree structure. Each component can have child components.
+# Use [[components]] to define top-level children, and [[components.components]] for nested children.
+
+[[components]]
+# Source URL format (required for child components with repositories):
+#   git://github.com/org/repo.git?version=v1.0.0&type=git
+#   https://github.com/org/repo.git?version=main
+#   file:///path/to/local/repo.git?version=v2.0.0
+#
+# URL components:
+#   - Scheme: git://, https://, or file:// (all indicate git repositories)
+#   - Query parameters:
+#     - version: git tag, branch, or commit to checkout
+#     - type: repository type (default: "git")
+source = "git://github.com/org/component1.git?version=v1.0.0"
+
+name = "component1"              # Required: Component name (used as directory name)
+description = "First component"  # Optional: Description of the component
+version = "1.0.0"                # Optional: Version override (usually specified in source URL)
+
+# Nested child components
+# Use the dot notation to nest components under their parent
+[[components.components]]
+source = "git://github.com/org/nested-component.git?version=v2.0.0"
+name = "nested-component"
+description = "A component nested under component1"
+
+# Additional top-level components
+[[components]]
+source = "git://github.com/org/component2.git?version=v3.0.0"
+name = "component2"
+description = "Second component"
+
+# Example: Component without a repository
+# Useful for organizing structure without cloning anything
+[[components]]
+name = "local-only"
+description = "This component has no source repository"
+# No source field means this component won't be cloned/synced
+
+# Common source URL patterns:
+#
+# 1. GitHub HTTPS (with version):
+#    source = "https://github.com/org/repo.git?version=v1.0.0"
+#
+# 2. GitHub git protocol (with branch):
+#    source = "git://github.com/org/repo.git?version=main"
+#
+# 3. Local file path:
+#    source = "file:///absolute/path/to/repo.git?version=v2.0.0"
+#
+# 4. With explicit type parameter:
+#    source = "git://github.com/org/repo.git?version=v1.0.0&type=git"
+
+# Commands that use this configuration:
+#
+# monhang workspace sync [-f config.toml]
+#   Synchronizes all components defined in the configuration.
+#   Clones missing components and updates existing ones.
+#
+# monhang exec [-f config.toml] <command>
+#   Executes a command in each component directory.
+#
+# monhang git [-f config.toml] <subcommand>
+#   Runs git operations across all component repositories.

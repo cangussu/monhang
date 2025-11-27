@@ -7,6 +7,7 @@ package components
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/cangussu/monhang/internal/logging"
+	"github.com/cangussu/monhang/internal/validator"
 )
 
 const (
@@ -146,7 +148,26 @@ func ParseComponentFile(filename string) (*Component, error) {
 	// Detect file format by extension
 	ext := strings.ToLower(filepath.Ext(filename))
 
-	logging.GetLogger("component").Debug().Str("filename", filename).Str("extension", ext).Msg("Parsing component file")
+	logging.GetLogger("component").Debug().
+		Str("filename", filename).
+		Str("extension", ext).
+		Msg("Parsing component file")
+
+	// Validate raw data against schema BEFORE parsing
+	var validationErr error
+	if ext == ".toml" {
+		validationErr = validator.ValidateTOML(data)
+	} else {
+		validationErr = validator.ValidateJSON(data)
+	}
+
+	if validationErr != nil {
+		logging.GetLogger("component").Error().
+			Err(validationErr).
+			Str("filename", filename).
+			Msg("Schema validation failed")
+		return nil, fmt.Errorf("configuration validation failed: %w", validationErr)
+	}
 
 	if ext == ".toml" {
 		// Parse TOML format
@@ -156,7 +177,25 @@ func ParseComponentFile(filename string) (*Component, error) {
 		err = json.Unmarshal(data, &comp)
 	}
 
-	return &comp, err
+	if err != nil {
+		return nil, err
+	}
+
+	// Post-parse validation (double-check struct after unmarshaling)
+	if structErr := validator.ValidateComponent(&comp); structErr != nil {
+		logging.GetLogger("component").Error().
+			Err(structErr).
+			Str("filename", filename).
+			Msg("Post-parse validation failed")
+		return nil, fmt.Errorf("configuration validation failed: %w", structErr)
+	}
+
+	logging.GetLogger("component").Debug().
+		Str("filename", filename).
+		Str("name", comp.Name).
+		Msg("Component file parsed and validated successfully")
+
+	return &comp, nil
 }
 
 // CreateLocalComponent creates a component representing the current directory.

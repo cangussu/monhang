@@ -1,0 +1,6 @@
+{
+  "name": "test-component",
+  "version": "1.0.0",
+  "unexpected_field": "this should not be here",
+  "another_invalid": true
+}

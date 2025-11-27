@@ -1,0 +1,5 @@
+{
+  "name": "test-component",
+  "source": "github.com/org/repo",
+  "description": "Source without URL scheme"
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/cangussu/monhang/schema/monhang-manifest.schema.json",
+  "title": "Monhang Component Manifest",
+  "description": "Schema for monhang component configuration files (JSON and TOML formats)",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Component name (used as directory name)",
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "version": {
+      "type": "string",
+      "description": "Component version (semantic versioning with optional 'v' prefix)",
+      "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-.+)?$"
+    },
+    "source": {
+      "type": "string",
+      "description": "Source repository URL with optional query parameters for version and type",
+      "pattern": "^(git|https?|file|ssh)://.+"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable component description"
+    },
+    "components": {
+      "type": "array",
+      "description": "Child components (recursive)",
+      "items": {
+        "$ref": "#"
+      }
+    }
+  },
+  "additionalProperties": false
+}
