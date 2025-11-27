@@ -19,8 +19,8 @@
     },
     "source": {
       "type": "string",
-      "description": "Source repository URL with optional query parameters for version and type",
-      "pattern": "^(git|https?|file|ssh)://.+"
+      "description": "Source repository URL with optional query parameters for version and type. Supports both standard URLs (git://, https://, etc.) and SSH format (git@host:path)",
+      "pattern": "^((git|https?|file|ssh)://.+|git@.+:.+)"
     },
     "description": {
       "type": "string",

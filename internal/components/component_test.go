@@ -138,6 +138,20 @@ func TestResolveRepo(t *testing.T) {
 			},
 			expected: "",
 		},
+		{
+			name: "SSH format URL should be preserved",
+			comp: Component{
+				Source: "git@github.com:monhang/monhang.git?version=v1.0.0",
+			},
+			expected: "git@github.com:monhang/monhang.git",
+		},
+		{
+			name: "SSH format URL without query params",
+			comp: Component{
+				Source: "git@github.com:monhang/monhang.git",
+			},
+			expected: "git@github.com:monhang/monhang.git",
+		},
 	}
 
 	for _, tt := range tests {
@@ -186,6 +200,22 @@ func TestGetVersion(t *testing.T) {
 				Source: "git://github.com/org/repo.git",
 			},
 			expected: "",
+		},
+		{
+			name: "version from SSH format source URL",
+			comp: Component{
+				Source:  "git@github.com:monhang/monhang.git?version=v1.2.3",
+				Version: "v2.0.0",
+			},
+			expected: "v1.2.3",
+		},
+		{
+			name: "SSH format with no version falls back to Version field",
+			comp: Component{
+				Source:  "git@github.com:monhang/monhang.git",
+				Version: "v3.0.0",
+			},
+			expected: "v3.0.0",
 		},
 	}
 
@@ -238,6 +268,20 @@ func TestGetType(t *testing.T) {
 			name:     "default type when no source",
 			comp:     Component{},
 			expected: "git",
+		},
+		{
+			name: "type from SSH format defaults to git",
+			comp: Component{
+				Source: "git@github.com:monhang/monhang.git",
+			},
+			expected: "git",
+		},
+		{
+			name: "type from SSH format with explicit type parameter",
+			comp: Component{
+				Source: "git@github.com:monhang/monhang.git?type=svn",
+			},
+			expected: "svn",
 		},
 	}
 

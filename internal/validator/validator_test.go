@@ -88,6 +88,14 @@ func TestValidateJSON_Valid(t *testing.T) {
 			json: `{"name": "test", "source": "ssh://git@github.com/org/repo.git"}`,
 		},
 		{
+			name: "SSH git format (git@host:path)",
+			json: `{"name": "test", "source": "git@github.com:monhang/monhang.git"}`,
+		},
+		{
+			name: "SSH git format with query params",
+			json: `{"name": "test", "source": "git@github.com:monhang/monhang.git?version=v1.0.0"}`,
+		},
+		{
 			name: "empty components array",
 			json: `{"name": "test", "components": []}`,
 		},
@@ -205,6 +213,13 @@ source = "https://github.com/org/child.git"
 
 [[components]]
 name = "child2"
+`,
+		},
+		{
+			name: "SSH git format source",
+			toml: `
+name = "test-component"
+source = "git@github.com:monhang/monhang.git"
 `,
 		},
 	}

@@ -28,7 +28,8 @@ const (
 // The top-level manifest is itself a Component.
 //
 // The Source URL encodes both the repository location and metadata:
-// - Schema determines the type: git://, https://, file:// all indicate git repositories
+// - Schema determines the type: git://, https://, file://, ssh:// all indicate git repositories
+// - SSH format (git@host:path) is also supported for git repositories
 // - Query parameter ?type=<type> can override the schema-based type detection
 // - Query parameter ?version=<version> specifies the version/tag/branch
 // - Default type is "git" if not specified
@@ -37,6 +38,7 @@ const (
 //   - git://github.com/org/repo.git?version=v1.0.0
 //   - https://github.com/org/repo.git?version=main
 //   - file:///path/to/local/repo.git?version=v2.0.0
+//   - git@github.com:org/repo.git?version=v1.0.0
 type Component struct {
 	Source      string       `json:"source,omitempty" toml:"source,omitempty"`
 	Name        string       `json:"name" toml:"name"`
@@ -55,15 +57,43 @@ func (comp *Component) HasRepo() bool {
 //   - git://github.com/org/repo.git?version=v1.0.0&type=git
 //   - https://github.com/org/repo.git?version=main
 //   - file:///path/to/repo.git?version=v2.0.0
+//   - git@github.com:org/repo.git?version=v1.0.0
 //
 // Returns:
 //   - repoURL: cleaned repository URL suitable for git clone
 //   - version: version/tag/branch to checkout (from ?version param)
 //   - repoType: repository type, determined by:
 //     1. Query parameter ?type=<type> if present
-//     2. URL scheme (git://, https://, file:// → "git")
-//     3. Default: "git"
+//     2. URL scheme (git://, https://, file://, ssh:// → "git")
+//     3. SSH format (git@host:path → "git")
+//     4. Default: "git"
 func parseSourceURL(source string) (repoURL, version, repoType string) {
+	// Handle SSH format (git@host:path)
+	if strings.HasPrefix(source, "git@") {
+		// Split by '?' to separate URL from query parameters
+		parts := strings.SplitN(source, "?", 2)
+		sshURL := parts[0]
+
+		// Parse query parameters if they exist
+		var queryParams url.Values
+		if len(parts) == 2 {
+			var err error
+			queryParams, err = url.ParseQuery(parts[1])
+			if err == nil {
+				version = queryParams.Get("version")
+				repoType = queryParams.Get("type")
+			}
+		}
+
+		// Default type for SSH is git
+		if repoType == "" {
+			repoType = DefaultRepoType
+		}
+
+		// Return the SSH URL as-is (git supports this format natively)
+		return sshURL, version, repoType
+	}
+
 	// Parse the URL
 	u, err := url.Parse(source)
 	if err != nil {
