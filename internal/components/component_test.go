@@ -4,133 +4,249 @@ import (
 	"testing"
 )
 
-func TestGitFetch(t *testing.T) {
-	// Duck typing git:
-	var givenArgs []string
-	git = func(args []string) {
-		givenArgs = args
-	}
-
-	ref := ComponentRef{
-		Name:    "teste1",
-		Repo:    "this.that",
-		Version: "1.0.0",
-	}
-
-	ref.Fetch()
-	if len(givenArgs) > 3 {
-		t.Errorf("invalid number of arguments: %d %v", len(givenArgs), givenArgs)
-	}
-
-	if givenArgs[0] != "clone" {
-		t.Errorf("invalid git command: %s", givenArgs[0])
-	}
-
-	if givenArgs[1] != ref.Repo {
-		t.Errorf("invalid URL: %s", givenArgs[1])
-	}
-
-	if givenArgs[2] != ref.Name {
-		t.Errorf("invalid repo name: %s", givenArgs[2])
-	}
-}
-
 //nolint:gocognit,gocyclo // Test validation function with comprehensive checks
-func validateProjectConfig(t *testing.T, proj *Project) {
+func validateComponentConfig(t *testing.T, comp *Component) {
 	t.Helper()
 
-	if proj.Name != "top-app" {
-		t.Errorf("Expected name 'top-app', got '%s'", proj.Name)
+	if comp.Name != "top-app" {
+		t.Errorf("Expected name 'top-app', got '%s'", comp.Name)
 	}
 
-	if proj.Version != "1.0.3" {
-		t.Errorf("Expected version '1.0.3', got '%s'", proj.Version)
+	if comp.Version != "1.0.3" {
+		t.Errorf("Expected version '1.0.3', got '%s'", comp.Version)
 	}
 
-	if proj.Repo != "monhang.git" {
-		t.Errorf("Expected repo 'monhang.git', got '%s'", proj.Repo)
+	if comp.Source != "git://github.com/monhang/monhang.git?version=v1.0.3" {
+		t.Errorf("Expected source 'git://github.com/monhang/monhang.git?version=v1.0.3', got '%s'", comp.Source)
 	}
 
-	if proj.Repoconfig == nil {
-		t.Fatal("Expected repoconfig to be set")
+	if comp.Description != "Top-level application" {
+		t.Errorf("Expected description 'Top-level application', got '%s'", comp.Description)
 	}
 
-	if proj.Repoconfig.Type != "git" {
-		t.Errorf("Expected repoconfig type 'git', got '%s'", proj.Repoconfig.Type)
+	// Validate child components
+	if len(comp.Components) != 2 {
+		t.Errorf("Expected 2 child components, got %d", len(comp.Components))
 	}
 
-	if proj.Repoconfig.Base != "git@github.com:monhang/" {
-		t.Errorf("Expected repoconfig base 'git@github.com:monhang/', got '%s'", proj.Repoconfig.Base)
-	}
-
-	// Validate components
-	if len(proj.Components) != 2 {
-		t.Errorf("Expected 2 components, got %d", len(proj.Components))
-	}
-
-	if len(proj.Components) > 0 {
+	if len(comp.Components) > 0 {
 		// First component
-		comp := proj.Components[0]
-		if comp.Name != "core" {
-			t.Errorf("Expected first component name 'core', got '%s'", comp.Name)
+		child := comp.Components[0]
+		if child.Name != "core" {
+			t.Errorf("Expected first component name 'core', got '%s'", child.Name)
 		}
-		if comp.Description != "Core library component" {
-			t.Errorf("Expected first component description 'Core library component', got '%s'", comp.Description)
+		if child.Description != "Core library component" {
+			t.Errorf("Expected first component description 'Core library component', got '%s'", child.Description)
 		}
-		if comp.Source != "git://github.com/monhang/core.git?version=v1.0.0&type=git" {
-			t.Errorf("Expected first component source 'git://github.com/monhang/core.git?version=v1.0.0&type=git', got '%s'", comp.Source)
+		if child.Source != "git://github.com/monhang/core.git?version=v1.0.0&type=git" {
+			t.Errorf("Expected first component source 'git://github.com/monhang/core.git?version=v1.0.0&type=git', got '%s'", child.Source)
 		}
 
 		// First component's child
-		if len(comp.Children) != 1 {
-			t.Errorf("Expected first component to have 1 child, got %d", len(comp.Children))
+		if len(child.Components) != 1 {
+			t.Errorf("Expected first component to have 1 child, got %d", len(child.Components))
 		}
-		if len(comp.Children) > 0 {
-			child := comp.Children[0]
-			if child.Name != "utils" {
-				t.Errorf("Expected child component name 'utils', got '%s'", child.Name)
+		if len(child.Components) > 0 {
+			grandchild := child.Components[0]
+			if grandchild.Name != "utils" {
+				t.Errorf("Expected child component name 'utils', got '%s'", grandchild.Name)
 			}
-			if child.Description != "Utility functions" {
-				t.Errorf("Expected child component description 'Utility functions', got '%s'", child.Description)
+			if grandchild.Description != "Utility functions" {
+				t.Errorf("Expected child component description 'Utility functions', got '%s'", grandchild.Description)
 			}
-			if child.Source != "git://github.com/monhang/utils.git?version=v2.1.0&type=git" {
-				t.Errorf("Expected child component source 'git://github.com/monhang/utils.git?version=v2.1.0&type=git', got '%s'", child.Source)
+			if grandchild.Source != "git://github.com/monhang/utils.git?version=v2.1.0&type=git" {
+				t.Errorf("Expected child component source 'git://github.com/monhang/utils.git?version=v2.1.0&type=git', got '%s'", grandchild.Source)
 			}
 		}
 	}
 
-	if len(proj.Components) > 1 {
+	if len(comp.Components) > 1 {
 		// Second component
-		comp := proj.Components[1]
-		if comp.Name != "plugin" {
-			t.Errorf("Expected second component name 'plugin', got '%s'", comp.Name)
+		child := comp.Components[1]
+		if child.Name != "plugin" {
+			t.Errorf("Expected second component name 'plugin', got '%s'", child.Name)
 		}
-		if comp.Description != "Plugin system" {
-			t.Errorf("Expected second component description 'Plugin system', got '%s'", comp.Description)
+		if child.Description != "Plugin system" {
+			t.Errorf("Expected second component description 'Plugin system', got '%s'", child.Description)
 		}
-		if comp.Source != "git://github.com/monhang/plugin.git?version=v3.0.1&type=git" {
-			t.Errorf("Expected second component source 'git://github.com/monhang/plugin.git?version=v3.0.1&type=git', got '%s'", comp.Source)
+		if child.Source != "git://github.com/monhang/plugin.git?version=v3.0.1&type=git" {
+			t.Errorf("Expected second component source 'git://github.com/monhang/plugin.git?version=v3.0.1&type=git', got '%s'", child.Source)
 		}
-		if len(comp.Children) != 0 {
-			t.Errorf("Expected second component to have 0 children, got %d", len(comp.Children))
+		if len(child.Components) != 0 {
+			t.Errorf("Expected second component to have 0 children, got %d", len(child.Components))
 		}
 	}
 }
 
 func TestParseJSONConfig(t *testing.T) {
-	proj, err := ParseProjectFile("../testdata/monhang.json")
+	comp, err := ParseComponentFile("../testdata/monhang.json")
 	if err != nil {
 		t.Fatalf("Failed to parse JSON config: %v", err)
 	}
 
-	validateProjectConfig(t, proj)
+	validateComponentConfig(t, comp)
 }
 
 func TestParseTOMLConfig(t *testing.T) {
-	proj, err := ParseProjectFile("../testdata/monhang.toml")
+	comp, err := ParseComponentFile("../testdata/monhang.toml")
 	if err != nil {
 		t.Fatalf("Failed to parse TOML config: %v", err)
 	}
 
-	validateProjectConfig(t, proj)
+	validateComponentConfig(t, comp)
+}
+
+//nolint:govet // Component struct field alignment is acceptable for test readability
+func TestResolveRepo(t *testing.T) {
+	tests := []struct {
+		name     string
+		comp     Component
+		expected string
+	}{
+		{
+			name: "git:// URL should convert to https://",
+			comp: Component{
+				Source: "git://github.com/org/repo.git?version=v1.0.0",
+			},
+			expected: "https://github.com/org/repo.git",
+		},
+		{
+			name: "https:// URL should be preserved",
+			comp: Component{
+				Source: "https://github.com/org/repo.git?version=v1.0.0",
+			},
+			expected: "https://github.com/org/repo.git",
+		},
+		{
+			name: "file:// URL should be preserved",
+			comp: Component{
+				Source: "file:///home/user/repos/myrepo.git?version=v1.0.0",
+			},
+			expected: "file:///home/user/repos/myrepo.git",
+		},
+		{
+			name: "URL without version query param",
+			comp: Component{
+				Source: "https://github.com/org/repo.git",
+			},
+			expected: "https://github.com/org/repo.git",
+		},
+		{
+			name: "empty source returns empty string",
+			comp: Component{
+				Source: "",
+			},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.comp.ResolveRepo()
+			if result != tt.expected {
+				t.Errorf("ResolveRepo() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+//nolint:govet // Component struct field alignment is acceptable for test readability
+func TestGetVersion(t *testing.T) {
+	tests := []struct {
+		name     string
+		comp     Component
+		expected string
+	}{
+		{
+			name: "version from source URL",
+			comp: Component{
+				Source:  "git://github.com/org/repo.git?version=v1.0.0",
+				Version: "v2.0.0",
+			},
+			expected: "v1.0.0",
+		},
+		{
+			name: "version from Version field when source has no version",
+			comp: Component{
+				Source:  "git://github.com/org/repo.git",
+				Version: "v2.0.0",
+			},
+			expected: "v2.0.0",
+		},
+		{
+			name: "version from Version field when no source",
+			comp: Component{
+				Version: "v3.0.0",
+			},
+			expected: "v3.0.0",
+		},
+		{
+			name: "empty version",
+			comp: Component{
+				Source: "git://github.com/org/repo.git",
+			},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.comp.GetVersion()
+			if result != tt.expected {
+				t.Errorf("GetVersion() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+//nolint:govet // Component struct field alignment is acceptable for test readability
+func TestGetType(t *testing.T) {
+	tests := []struct {
+		name     string
+		comp     Component
+		expected string
+	}{
+		{
+			name: "type from query parameter",
+			comp: Component{
+				Source: "git://github.com/org/repo.git?type=svn",
+			},
+			expected: "svn",
+		},
+		{
+			name: "type from git:// scheme",
+			comp: Component{
+				Source: "git://github.com/org/repo.git",
+			},
+			expected: "git",
+		},
+		{
+			name: "type from https:// scheme",
+			comp: Component{
+				Source: "https://github.com/org/repo.git",
+			},
+			expected: "git",
+		},
+		{
+			name: "type from file:// scheme",
+			comp: Component{
+				Source: "file:///path/to/repo.git",
+			},
+			expected: "git",
+		},
+		{
+			name:     "default type when no source",
+			comp:     Component{},
+			expected: "git",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.comp.GetType()
+			if result != tt.expected {
+				t.Errorf("GetType() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
 }

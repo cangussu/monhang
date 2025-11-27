@@ -53,7 +53,6 @@ func usageExit() {
 
 The commands are:
 
-	boot        bootstraps a workspace
 	exec        run arbitrary commands inside each repo
 	git         run git operations across all repos
 	workspace   manage workspace components (alias: ws)
@@ -72,7 +71,6 @@ var cmdHelp = &commands.Command{
 }
 
 var cmds = []*commands.Command{
-	commands.CmdBoot,
 	commands.CmdExec,
 	commands.CmdGit,
 	commands.CmdWorkspace,

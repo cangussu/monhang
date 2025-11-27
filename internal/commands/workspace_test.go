@@ -21,12 +21,12 @@ const (
 )
 
 func TestFlattenComponents(t *testing.T) {
-	comps := []components.Component{
+	comps := []*components.Component{
 		{
 			Name:        testComponentCoreName,
 			Source:      testComponentCoreSource,
 			Description: testComponentCoreDescription,
-			Children: []components.Component{
+			Components: []*components.Component{
 				{
 					Name:        testComponentUtilsName,
 					Source:      testComponentUtilsSource,
@@ -160,15 +160,15 @@ func TestSyncResultsInProgress(t *testing.T) {
 	}
 }
 
-func validateComponents(t *testing.T, proj *components.Project) {
+func validateComponents(t *testing.T, comp *components.Component) {
 	t.Helper()
 
-	if len(proj.Components) != 2 {
-		t.Fatalf("Expected 2 components, got %d", len(proj.Components))
+	if len(comp.Components) != 2 {
+		t.Fatalf("Expected 2 child components, got %d", len(comp.Components))
 	}
 
 	// Test first component
-	core := proj.Components[0]
+	core := comp.Components[0]
 	if core.Name != testComponentCoreName {
 		t.Errorf("Expected component name '%s', got '%s'", testComponentCoreName, core.Name)
 	}
@@ -178,13 +178,13 @@ func validateComponents(t *testing.T, proj *components.Project) {
 	if core.Description != testComponentCoreDescription {
 		t.Errorf("Expected correct description, got '%s'", core.Description)
 	}
-	if len(core.Children) != 1 {
-		t.Errorf("Expected 1 child, got %d", len(core.Children))
+	if len(core.Components) != 1 {
+		t.Errorf("Expected 1 child, got %d", len(core.Components))
 	}
 
 	// Test first component's child
-	if len(core.Children) > 0 {
-		utils := core.Children[0]
+	if len(core.Components) > 0 {
+		utils := core.Components[0]
 		if utils.Name != testComponentUtilsName {
 			t.Errorf("Expected child name '%s', got '%s'", testComponentUtilsName, utils.Name)
 		}
@@ -194,43 +194,46 @@ func validateComponents(t *testing.T, proj *components.Project) {
 	}
 
 	// Test second component
-	plugin := proj.Components[1]
+	plugin := comp.Components[1]
 	if plugin.Name != testComponentPluginName {
 		t.Errorf("Expected component name '%s', got '%s'", testComponentPluginName, plugin.Name)
 	}
-	if len(plugin.Children) != 0 {
-		t.Errorf("Expected 0 children for plugin, got %d", len(plugin.Children))
+	if len(plugin.Components) != 0 {
+		t.Errorf("Expected 0 children for plugin, got %d", len(plugin.Components))
 	}
 }
 
 func TestParseComponentsFromJSON(t *testing.T) {
-	proj, err := components.ParseProjectFile("../testdata/monhang.json")
+	comp, err := components.ParseComponentFile("../testdata/monhang.json")
 	if err != nil {
 		t.Fatalf("Failed to parse JSON config: %v", err)
 	}
 
-	validateComponents(t, proj)
+	validateComponents(t, comp)
 }
 
 func TestParseComponentsFromTOML(t *testing.T) {
-	proj, err := components.ParseProjectFile("../testdata/monhang.toml")
+	comp, err := components.ParseComponentFile("../testdata/monhang.toml")
 	if err != nil {
 		t.Fatalf("Failed to parse TOML config: %v", err)
 	}
 
-	validateComponents(t, proj)
+	validateComponents(t, comp)
 }
 
 func TestEmptyComponentsList(t *testing.T) {
-	// Create a project with no components
-	proj := &components.Project{
-		ComponentRef: components.ComponentRef{
-			Name: "test-app",
-		},
-		Components: []components.Component{},
+	// Create a component with no children
+	comp := &components.Component{
+		Name:       "test-app",
+		Components: []*components.Component{},
 	}
 
-	if len(proj.Components) != 0 {
-		t.Errorf("Expected 0 components, got %d", len(proj.Components))
+	// Verify component name is set
+	if comp.Name != "test-app" {
+		t.Errorf("Expected component name 'test-app', got '%s'", comp.Name)
+	}
+
+	if len(comp.Components) != 0 {
+		t.Errorf("Expected 0 child components, got %d", len(comp.Components))
 	}
 }

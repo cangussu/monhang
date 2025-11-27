@@ -7,8 +7,8 @@ package components
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -16,69 +16,124 @@ import (
 	"github.com/cangussu/monhang/internal/logging"
 )
 
-// ComponentRef is the configuration block that references a component.
-type ComponentRef struct {
-	Repoconfig *RepoConfig `json:"repoconfig" toml:"repoconfig"`
-	Name       string      `json:"name" toml:"name"`
-	Version    string      `json:"version" toml:"version"`
-	Repo       string      `json:"repo" toml:"repo"`
-}
-
-// RepoConfig defines the configuration for a repository.
-type RepoConfig struct {
-	Type string `json:"type" toml:"type"`
-	Base string `json:"base" toml:"base"`
-}
+const (
+	// DefaultRepoType is the default repository type when not specified.
+	DefaultRepoType = "git"
+)
 
 // Component represents a component in the workspace.
-// The Source URL encodes the version and type (schema).
+// This is a recursive structure where a component can have children components.
+// The top-level manifest is itself a Component.
+//
+// The Source URL encodes both the repository location and metadata:
+// - Schema determines the type: git://, https://, file:// all indicate git repositories
+// - Query parameter ?type=<type> can override the schema-based type detection
+// - Query parameter ?version=<version> specifies the version/tag/branch
+// - Default type is "git" if not specified
+//
+// Examples:
+//   - git://github.com/org/repo.git?version=v1.0.0
+//   - https://github.com/org/repo.git?version=main
+//   - file:///path/to/local/repo.git?version=v2.0.0
 type Component struct {
-	Source      string      `json:"source" toml:"source"`
-	Name        string      `json:"name" toml:"name"`
-	Description string      `json:"description" toml:"description"`
-	Children    []Component `json:"children,omitempty" toml:"children,omitempty"`
+	Source      string       `json:"source,omitempty" toml:"source,omitempty"`
+	Name        string       `json:"name" toml:"name"`
+	Description string       `json:"description,omitempty" toml:"description,omitempty"`
+	Version     string       `json:"version,omitempty" toml:"version,omitempty"`
+	Components  []*Component `json:"components,omitempty" toml:"components,omitempty"`
 }
 
-// Project is the toplevel struct that represents a configuration file.
-type Project struct {
-	ComponentRef
-	Components []Component `json:"components,omitempty" toml:"components,omitempty"`
+// HasRepo returns true if the component has a source configured.
+func (comp *Component) HasRepo() bool {
+	return comp.Source != ""
 }
 
-var git = func(args []string) {
-	logging.GetLogger("component").Info().Strs("args", args).Msg("Executing git command")
-	_, err := exec.Command("git", args...).Output()
+// parseSourceURL extracts the repository URL, version, and type from a component source.
+// Source format examples:
+//   - git://github.com/org/repo.git?version=v1.0.0&type=git
+//   - https://github.com/org/repo.git?version=main
+//   - file:///path/to/repo.git?version=v2.0.0
+//
+// Returns:
+//   - repoURL: cleaned repository URL suitable for git clone
+//   - version: version/tag/branch to checkout (from ?version param)
+//   - repoType: repository type, determined by:
+//     1. Query parameter ?type=<type> if present
+//     2. URL scheme (git://, https://, file:// → "git")
+//     3. Default: "git"
+func parseSourceURL(source string) (repoURL, version, repoType string) {
+	// Parse the URL
+	u, err := url.Parse(source)
 	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			msg := string(ee.Stderr)
-			logging.GetLogger("component").Fatal().Str("stderr", msg).Msg("Error executing git command")
+		// If parsing fails, return the source as-is with default type
+		return source, "", DefaultRepoType
+	}
+
+	// Extract metadata from query parameters
+	version = u.Query().Get("version")
+	repoType = u.Query().Get("type")
+
+	// If type not specified in query params, determine from scheme
+	if repoType == "" {
+		switch u.Scheme {
+		case "git", "https", "http", "file", "ssh":
+			repoType = DefaultRepoType
+		default:
+			repoType = DefaultRepoType // Default to git
 		}
-
-		logging.GetLogger("component").Fatal().Err(err).Msg("Error executing git command")
 	}
-}
 
-func resolveRepo(comp ComponentRef) string {
-	var repo string
-	if comp.Repoconfig != nil {
-		repo = comp.Repoconfig.Base + comp.Repo
-	} else {
-		repo = comp.Repo
+	// Remove query string to get clean repo URL
+	u.RawQuery = ""
+
+	// Convert git:// to https:// for cloning
+	repoURL = u.String()
+	if strings.HasPrefix(repoURL, "git://") {
+		repoURL = "https://" + strings.TrimPrefix(repoURL, "git://")
 	}
-	return repo
+
+	return repoURL, version, repoType
 }
 
-// Fetch the specified component.
-func (comp ComponentRef) Fetch() {
-	repo := resolveRepo(comp)
-	args := []string{"clone", repo, comp.Name}
-	git(args)
+// ResolveRepo returns the full repository URL for this component.
+// It parses the Source field and removes query parameters.
+func (comp *Component) ResolveRepo() string {
+	if comp.Source == "" {
+		return ""
+	}
+
+	repoURL, _, _ := parseSourceURL(comp.Source)
+	return repoURL
 }
 
-// Project methods
+// GetVersion returns the version specified in the source URL.
+// Returns empty string if no version is specified.
+func (comp *Component) GetVersion() string {
+	if comp.Source == "" {
+		return comp.Version
+	}
 
-// ParseProjectFile parses a project configuration file (JSON or TOML format).
-func ParseProjectFile(filename string) (*Project, error) {
+	_, version, _ := parseSourceURL(comp.Source)
+	if version != "" {
+		return version
+	}
+	return comp.Version
+}
+
+// GetType returns the repository type determined from the source URL.
+// Returns "git" by default.
+func (comp *Component) GetType() string {
+	if comp.Source == "" {
+		return DefaultRepoType
+	}
+
+	_, _, repoType := parseSourceURL(comp.Source)
+	return repoType
+}
+
+// ParseComponentFile parses a component configuration file (JSON or TOML format).
+// The file represents the top-level component manifest.
+func ParseComponentFile(filename string) (*Component, error) {
 	var data []byte
 	// #nosec G304 -- filename is a config file path provided by the user
 	data, err := os.ReadFile(filename)
@@ -86,33 +141,30 @@ func ParseProjectFile(filename string) (*Project, error) {
 		return nil, err
 	}
 
-	var proj Project
+	var comp Component
 
 	// Detect file format by extension
 	ext := strings.ToLower(filepath.Ext(filename))
 
-	logging.GetLogger("component").Debug().Str("filename", filename).Str("extension", ext).Msg("Parsing project file")
+	logging.GetLogger("component").Debug().Str("filename", filename).Str("extension", ext).Msg("Parsing component file")
 
 	if ext == ".toml" {
 		// Parse TOML format
-		err = toml.Unmarshal(data, &proj)
+		err = toml.Unmarshal(data, &comp)
 	} else {
 		// Default to JSON format for .json or other extensions
-		err = json.Unmarshal(data, &proj)
+		err = json.Unmarshal(data, &comp)
 	}
 
-	return &proj, err
+	return &comp, err
 }
 
-// CreateLocalProject creates a project representing the current directory as a git repository.
-func CreateLocalProject(name string) *Project {
-	logging.GetLogger("git").Debug().Msg("No config file found, using current directory as git repository")
-	// Create a minimal project with just the current directory
-	// Use "." as the name so getRepos() will find it in the current directory
-	proj := &Project{
-		ComponentRef: ComponentRef{
-			Name: name,
-		},
+// CreateLocalComponent creates a component representing the current directory.
+// This is used when no manifest file exists - the current directory is treated as a local component.
+func CreateLocalComponent(name string) *Component {
+	logging.GetLogger("component").Debug().Msg("No config file found, using current directory as local component")
+	comp := &Component{
+		Name: name,
 	}
-	return proj
+	return comp
 }

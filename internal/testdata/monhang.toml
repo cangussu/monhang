@@ -1,17 +1,14 @@
 name = "top-app"
 version = "1.0.3"
-repo = "monhang.git"
-
-[repoconfig]
-type = "git"
-base = "git@github.com:monhang/"
+source = "git://github.com/monhang/monhang.git?version=v1.0.3"
+description = "Top-level application"
 
 [[components]]
 source = "git://github.com/monhang/core.git?version=v1.0.0&type=git"
 name = "core"
 description = "Core library component"
 
-[[components.children]]
+[[components.components]]
 source = "git://github.com/monhang/utils.git?version=v2.1.0&type=git"
 name = "utils"
 description = "Utility functions"

@@ -189,7 +189,7 @@ func (re *RepoExecutor) GetResults() map[string]*RepoResult {
 //
 //nolint:govet // fieldalignment: UI model where field order doesn't significantly impact performance
 type model struct {
-	repos       []components.ComponentRef
+	repos       []*components.Component
 	results     map[string]*RepoResult
 	executor    *RepoExecutor
 	command     string
@@ -391,7 +391,20 @@ func (m model) View() string {
 }
 
 // runInteractiveMode starts command execution in interactive mode with bubbletea UI.
-func runInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor, command string, parallel bool) error {
+func runInteractiveMode(repos []*components.Component, executor *RepoExecutor, command string, parallel bool) error {
+	// Redirect logging to a file during interactive mode
+	logFile, previousLogger, err := logging.RedirectLoggingToFile()
+	if err != nil {
+		logging.GetLogger("exec").Warn().Err(err).Msg("Failed to redirect logs")
+		return fmt.Errorf("failed to redirect logs: %w", err)
+	}
+	defer func() {
+		logPath := logging.RestoreLogger(logFile, previousLogger)
+		if logging.IsDebugEnabled() {
+			logging.GetLogger("exec").Debug().Str("log_file", logPath).Msg("Interactive session logs saved")
+		}
+	}()
+
 	ctx := context.Background()
 
 	// Start all executions
@@ -399,7 +412,7 @@ func runInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor,
 		var wg sync.WaitGroup
 		for _, repo := range repos {
 			wg.Add(1)
-			go func(r components.ComponentRef) {
+			go func(r *components.Component) {
 				defer wg.Done()
 				path := filepath.Join(".", r.Name)
 				executor.ExecuteCommand(ctx, r.Name, path, command)
@@ -420,12 +433,15 @@ func runInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor,
 	}
 
 	// Start bubbletea UI
-	p := tea.NewProgram(model{
-		repos:    repos,
-		results:  make(map[string]*RepoResult),
-		executor: executor,
-		command:  command,
-	})
+	p := tea.NewProgram(
+		model{
+			repos:    repos,
+			results:  make(map[string]*RepoResult),
+			executor: executor,
+			command:  command,
+		},
+		tea.WithMouseCellMotion(), // Enable mouse support
+	)
 
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("error running UI: %w", err)
@@ -435,7 +451,7 @@ func runInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor,
 }
 
 // runNonInteractiveMode executes commands in non-interactive mode.
-func runNonInteractiveMode(repos []components.ComponentRef, executor *RepoExecutor, command string, parallel bool) {
+func runNonInteractiveMode(repos []*components.Component, executor *RepoExecutor, command string, parallel bool) {
 	ctx := context.Background()
 
 	if parallel {
@@ -443,7 +459,7 @@ func runNonInteractiveMode(repos []components.ComponentRef, executor *RepoExecut
 		var wg sync.WaitGroup
 		for _, repo := range repos {
 			wg.Add(1)
-			go func(r components.ComponentRef) {
+			go func(r *components.Component) {
 				defer wg.Done()
 				path := filepath.Join(".", r.Name)
 				logging.GetLogger("exec").Info().Str("repo", r.Name).Str("command", command).Msg("Executing command")
@@ -462,7 +478,7 @@ func runNonInteractiveMode(repos []components.ComponentRef, executor *RepoExecut
 }
 
 // printResults prints the execution results for all repos.
-func printResults(repos []components.ComponentRef, results map[string]*RepoResult) int {
+func printResults(repos []*components.Component, results map[string]*RepoResult) int {
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("EXECUTION RESULTS")
 	fmt.Println(strings.Repeat("=", 80))
@@ -516,14 +532,14 @@ func runExec(_ *Command, args []string) {
 		Msg("Starting exec command")
 
 	// Parse the configuration file
-	proj, err := components.ParseProjectFile(*execF)
+	comp, err := components.ParseComponentFile(*execF)
 	if err != nil {
-		logging.GetLogger("exec").Error().Err(err).Str("filename", *execF).Msg("Failed to parse project file")
+		logging.GetLogger("exec").Error().Err(err).Str("filename", *execF).Msg("Failed to parse component file")
 		Check(err)
 	}
 
-	// Build list of repos
-	repos := []components.ComponentRef{proj.ComponentRef}
+	// Build list of repos - include the top-level component and all children
+	repos := getRepos(comp)
 
 	if len(repos) == 0 {
 		logging.GetLogger("exec").Warn().Msg("No repositories found in configuration")

@@ -286,10 +286,10 @@ func getCurrentVersion(name string) string {
 func handleWorkspaceSync(filename string) {
 	logging.GetLogger("workspace").Info().Str("file", filename).Msg("Starting workspace sync")
 
-	proj, err := components.ParseProjectFile(filename)
+	comp, err := components.ParseComponentFile(filename)
 	Check(err)
 
-	if len(proj.Components) == 0 {
+	if len(comp.Components) == 0 {
 		logging.GetLogger("workspace").Info().Msg("No components defined in manifest")
 		fmt.Println("No components defined in manifest")
 		return
@@ -299,7 +299,7 @@ func handleWorkspaceSync(filename string) {
 	results := &SyncResults{}
 
 	// Collect all components (flatten tree)
-	allComponents := flattenComponents(proj.Components)
+	allComponents := flattenComponents(comp.Components)
 
 	// Run interactive sync
 	if err := runInteractiveSync(filename, allComponents, results); err != nil {
@@ -311,13 +311,13 @@ func handleWorkspaceSync(filename string) {
 }
 
 // flattenComponents flattens the component tree into a list.
-func flattenComponents(comps []components.Component) []components.Component {
+func flattenComponents(comps []*components.Component) []*components.Component {
 	// Pre-allocate with estimated capacity
-	result := make([]components.Component, 0, len(comps)*2)
+	result := make([]*components.Component, 0, len(comps)*2)
 	for _, comp := range comps {
 		result = append(result, comp)
-		if len(comp.Children) > 0 {
-			result = append(result, flattenComponents(comp.Children)...)
+		if len(comp.Components) > 0 {
+			result = append(result, flattenComponents(comp.Components)...)
 		}
 	}
 	return result
@@ -327,7 +327,7 @@ func flattenComponents(comps []components.Component) []components.Component {
 //
 //nolint:govet // fieldalignment: UI model where field order doesn't significantly impact performance
 type syncModel struct {
-	components []components.Component
+	components []*components.Component
 	results    *SyncResults
 	filename   string
 	allDone    bool
@@ -478,12 +478,28 @@ func (m syncModel) View() string {
 }
 
 // runInteractiveSync runs sync operation in interactive mode.
-func runInteractiveSync(filename string, comps []components.Component, results *SyncResults) error {
+func runInteractiveSync(filename string, comps []*components.Component, results *SyncResults) error {
 	// Check if we have a TTY
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
 		// Fall back to non-interactive mode
-		return runNonInteractiveSync(filename, comps, results)
+		runNonInteractiveSync(filename, comps, results)
+		return nil
 	}
+
+	// Redirect logging to a file during interactive mode to prevent output interference
+	// but still capture logs for debugging
+	logFile, previousLogger, err := logging.RedirectLoggingToFile()
+	if err != nil {
+		logging.GetLogger("workspace").Warn().Err(err).Msg("Failed to redirect logs, falling back to non-interactive")
+		runNonInteractiveSync(filename, comps, results)
+		return nil
+	}
+	defer func() {
+		logPath := logging.RestoreLogger(logFile, previousLogger)
+		if logging.IsDebugEnabled() {
+			logging.GetLogger("workspace").Debug().Str("log_file", logPath).Msg("Interactive session logs saved")
+		}
+	}()
 
 	// Start sync in background
 	go func() {
@@ -493,23 +509,31 @@ func runInteractiveSync(filename string, comps []components.Component, results *
 	}()
 
 	// Start bubbletea UI
-	p := tea.NewProgram(syncModel{
-		components: comps,
-		results:    results,
-		filename:   filename,
-	})
+	// Note: We don't use WithAltScreen() because it can cause flickering
+	// Instead, we suppress logging and let bubbletea manage the display
+	p := tea.NewProgram(
+		syncModel{
+			components: comps,
+			results:    results,
+			filename:   filename,
+		},
+		tea.WithMouseCellMotion(), // Enable mouse support
+	)
 
 	if _, err := p.Run(); err != nil {
+		// Restore logging before falling back
+		logPath := logging.RestoreLogger(logFile, previousLogger)
 		// If interactive mode fails, fall back to non-interactive
-		logging.GetLogger("workspace").Warn().Err(err).Msg("Interactive mode failed, falling back to non-interactive")
-		return runNonInteractiveSync(filename, comps, results)
+		logging.GetLogger("workspace").Warn().Err(err).Str("log_file", logPath).Msg("Interactive mode failed, falling back to non-interactive")
+		runNonInteractiveSync(filename, comps, results)
+		return nil
 	}
 
 	return nil
 }
 
 // runNonInteractiveSync runs sync in non-interactive mode (for CI/non-TTY environments).
-func runNonInteractiveSync(filename string, comps []components.Component, results *SyncResults) error {
+func runNonInteractiveSync(filename string, comps []*components.Component, results *SyncResults) {
 	styles := getSyncStyles()
 
 	fmt.Printf("Syncing %d component(s) from %s\n\n", len(comps), filename)
@@ -546,8 +570,6 @@ func runNonInteractiveSync(filename string, comps []components.Component, result
 
 	// Print final summary
 	printNonInteractiveSummary(results)
-
-	return nil
 }
 
 // printNonInteractiveSummary prints a summary in non-interactive mode.
@@ -585,7 +607,7 @@ func printNonInteractiveSummary(results *SyncResults) {
 }
 
 // syncComponentBackground synchronizes a component in the background.
-func syncComponentBackground(comp components.Component, results *SyncResults) {
+func syncComponentBackground(comp *components.Component, results *SyncResults) {
 	logging.GetLogger("workspace").Debug().
 		Str("name", comp.Name).
 		Str("source", comp.Source).

@@ -3,7 +3,7 @@
 # This script runs a comprehensive smoke test by:
 # 1. Setting up test git repositories
 # 2. Building monhang
-# 3. Testing boot command
+# 3. Testing workspace sync command
 # 4. Testing exec command
 # 5. Cleaning up
 
@@ -82,13 +82,13 @@ fi
 success "Test repositories created"
 echo ""
 
-# Step 3: Test boot command with JSON
-info "Step 3: Testing boot command (JSON config)..."
+# Step 3: Test workspace sync command with JSON
+info "Step 3: Testing workspace sync command (JSON config)..."
 cd "${TEST_DIR}"
 
-# Run boot command
-if ! "${MONHANG_BIN}" boot -f monhang.json > /dev/null 2>&1; then
-    error_exit "Boot command failed with JSON config"
+# Run workspace sync command
+if ! "${MONHANG_BIN}" workspace sync -f monhang.json > /dev/null 2>&1; then
+    error_exit "Workspace sync command failed with JSON config"
 fi
 
 # Verify repos were cloned
@@ -98,29 +98,26 @@ for repo in lib-utils lib-core lib-network; do
     fi
     info "  Verified: ${repo}"
 done
-success "Boot command (JSON) completed successfully"
+success "Workspace sync command (JSON) completed successfully"
 echo ""
 
-# Step 4: Test boot command with TOML
-info "Step 4: Testing boot command (TOML config)..."
+# Step 4: Test workspace sync command with TOML (update existing repos)
+info "Step 4: Testing workspace sync command (TOML config - update)..."
 cd "${TEST_DIR}"
 
-# Clean up cloned repos
-rm -rf lib-utils lib-core lib-network
-
-# Run boot command with TOML
-if ! "${MONHANG_BIN}" boot -f monhang.toml > /dev/null 2>&1; then
-    error_exit "Boot command failed with TOML config"
+# Run workspace sync command with TOML (should update existing repos)
+if ! "${MONHANG_BIN}" ws sync -f monhang.toml > /dev/null 2>&1; then
+    error_exit "Workspace sync command failed with TOML config"
 fi
 
-# Verify repos were cloned again
+# Verify repos still exist (should be updated, not re-cloned)
 for repo in lib-utils lib-core lib-network; do
     if [ ! -d "${repo}" ]; then
-        error_exit "Repository ${repo} was not cloned (TOML test)"
+        error_exit "Repository ${repo} was not updated (TOML test)"
     fi
     info "  Verified: ${repo}"
 done
-success "Boot command (TOML) completed successfully"
+success "Workspace sync command (TOML - update) completed successfully"
 echo ""
 
 # Step 5: Test exec command
@@ -178,7 +175,7 @@ if ! "${MONHANG_BIN}" help > /tmp/help.log 2>&1; then
 fi
 
 # Verify help contains expected commands
-for cmd in boot exec version; do
+for cmd in workspace exec version; do
     if ! grep -q "${cmd}" /tmp/help.log; then
         error_exit "Help doesn't mention ${cmd} command"
     fi
@@ -194,8 +191,8 @@ echo ""
 echo "Tests completed:"
 echo "  ✓ Build monhang"
 echo "  ✓ Setup test repositories"
-echo "  ✓ Boot command (JSON config)"
-echo "  ✓ Boot command (TOML config)"
+echo "  ✓ Workspace sync command (JSON config)"
+echo "  ✓ Workspace sync command (TOML config - update)"
 echo "  ✓ Exec command (sequential)"
 echo "  ✓ Exec command (parallel)"
 echo "  ✓ Exec command (custom script)"

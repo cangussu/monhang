@@ -324,7 +324,7 @@ func (ge *GitExecutor) GetResults() map[string]*GitResult {
 //
 //nolint:govet // fieldalignment: UI model where field order doesn't significantly impact performance
 type gitModel struct {
-	repos       []components.ComponentRef
+	repos       []*components.Component
 	results     map[string]*GitResult
 	executor    *GitExecutor
 	operation   string
@@ -558,17 +558,33 @@ func (m gitModel) View() string {
 }
 
 // runGitInteractive runs git operation in interactive mode.
-func runGitInteractive(repos []components.ComponentRef, executor *GitExecutor, operation string, execFunc func()) error {
+func runGitInteractive(repos []*components.Component, executor *GitExecutor, operation string, execFunc func()) error {
+	// Redirect logging to a file during interactive mode
+	logFile, previousLogger, err := logging.RedirectLoggingToFile()
+	if err != nil {
+		logging.GetLogger("git").Warn().Err(err).Msg("Failed to redirect logs")
+		return fmt.Errorf("failed to redirect logs: %w", err)
+	}
+	defer func() {
+		logPath := logging.RestoreLogger(logFile, previousLogger)
+		if logging.IsDebugEnabled() {
+			logging.GetLogger("git").Debug().Str("log_file", logPath).Msg("Interactive session logs saved")
+		}
+	}()
+
 	// Start execution in background
 	go execFunc()
 
 	// Start bubbletea UI
-	p := tea.NewProgram(gitModel{
-		repos:     repos,
-		results:   make(map[string]*GitResult),
-		executor:  executor,
-		operation: operation,
-	})
+	p := tea.NewProgram(
+		gitModel{
+			repos:     repos,
+			results:   make(map[string]*GitResult),
+			executor:  executor,
+			operation: operation,
+		},
+		tea.WithMouseCellMotion(), // Enable mouse support
+	)
 
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("error running UI: %w", err)
@@ -578,7 +594,7 @@ func runGitInteractive(repos []components.ComponentRef, executor *GitExecutor, o
 }
 
 // printGitTable prints the git results in a nice table format.
-func printGitTable(repos []components.ComponentRef, results map[string]*GitResult, operation string) {
+func printGitTable(repos []*components.Component, results map[string]*GitResult, operation string) {
 	styles := getGitUIStyles()
 
 	fmt.Println(styles.title.Render(" Git: " + operation + " "))
@@ -631,31 +647,34 @@ func printGitTable(repos []components.ComponentRef, results map[string]*GitResul
 		styles.error.Render(fmt.Sprintf("%d", failCount)))
 }
 
-// getRepos returns list of all repos from project.
-func getRepos(proj *components.Project) []components.ComponentRef {
-	repos := []components.ComponentRef{proj.ComponentRef}
+// getRepos returns list of all repos from component tree.
+// It includes the top-level component and recursively collects all child components.
+func getRepos(comp *components.Component) []*components.Component {
+	var repos []*components.Component
 
-	// Filter out repos that don't exist
-	var existing []components.ComponentRef
-	for _, repo := range repos {
-		path := filepath.Join(".", repo.Name)
-		if _, err := os.Stat(path); err == nil {
-			existing = append(existing, repo)
-		}
+	// Add the component itself if it exists
+	path := filepath.Join(".", comp.Name)
+	if _, err := os.Stat(path); err == nil {
+		repos = append(repos, comp)
 	}
 
-	return existing
+	// Recursively collect all child components
+	for _, child := range comp.Components {
+		repos = append(repos, getRepos(child)...)
+	}
+
+	return repos
 }
 
 // runGitOperation is a helper to run git operations across repos.
-func runGitOperation(repos []components.ComponentRef, parallel bool, opFunc func(context.Context, components.ComponentRef, string)) {
+func runGitOperation(repos []*components.Component, parallel bool, opFunc func(context.Context, *components.Component, string)) {
 	ctx := context.Background()
 
 	if parallel {
 		var wg sync.WaitGroup
 		for _, repo := range repos {
 			wg.Add(1)
-			go func(r components.ComponentRef) {
+			go func(r *components.Component) {
 				defer wg.Done()
 				path := filepath.Join(".", r.Name)
 				opFunc(ctx, r, path)
@@ -671,7 +690,7 @@ func runGitOperation(repos []components.ComponentRef, parallel bool, opFunc func
 }
 
 // executeGitSubcommand runs a git subcommand either interactively or non-interactively.
-func executeGitSubcommand(repos []components.ComponentRef, executor *GitExecutor, operation string, execFunc func()) {
+func executeGitSubcommand(repos []*components.Component, executor *GitExecutor, operation string, execFunc func()) {
 	if *gitInteractive {
 		if err := runGitInteractive(repos, executor, operation, execFunc); err != nil {
 			fmt.Printf("Error: %v\n", err)
@@ -684,11 +703,11 @@ func executeGitSubcommand(repos []components.ComponentRef, executor *GitExecutor
 }
 
 // handleGitStatus handles the git status subcommand.
-func handleGitStatus(repos []components.ComponentRef, executor *GitExecutor) {
+func handleGitStatus(repos []*components.Component, executor *GitExecutor) {
 	operation := "status"
 	execFunc := func() {
 		runGitOperation(repos, *gitParallel,
-			func(ctx context.Context, repo components.ComponentRef, path string) {
+			func(ctx context.Context, repo *components.Component, path string) {
 				executor.ExecuteStatus(ctx, repo.Name, path)
 			})
 	}
@@ -696,11 +715,11 @@ func handleGitStatus(repos []components.ComponentRef, executor *GitExecutor) {
 }
 
 // handleGitPull handles the git pull subcommand.
-func handleGitPull(repos []components.ComponentRef, executor *GitExecutor) {
+func handleGitPull(repos []*components.Component, executor *GitExecutor) {
 	operation := "pull"
 	execFunc := func() {
 		runGitOperation(repos, *gitParallel,
-			func(ctx context.Context, repo components.ComponentRef, path string) {
+			func(ctx context.Context, repo *components.Component, path string) {
 				executor.ExecutePull(ctx, repo.Name, path)
 			})
 	}
@@ -708,11 +727,11 @@ func handleGitPull(repos []components.ComponentRef, executor *GitExecutor) {
 }
 
 // handleGitFetch handles the git fetch subcommand.
-func handleGitFetch(repos []components.ComponentRef, executor *GitExecutor) {
+func handleGitFetch(repos []*components.Component, executor *GitExecutor) {
 	operation := "fetch"
 	execFunc := func() {
 		runGitOperation(repos, *gitParallel,
-			func(ctx context.Context, repo components.ComponentRef, path string) {
+			func(ctx context.Context, repo *components.Component, path string) {
 				executor.ExecuteFetch(ctx, repo.Name, path)
 			})
 	}
@@ -720,7 +739,7 @@ func handleGitFetch(repos []components.ComponentRef, executor *GitExecutor) {
 }
 
 // handleGitCheckout handles the git checkout subcommand.
-func handleGitCheckout(repos []components.ComponentRef, executor *GitExecutor, subArgs []string) {
+func handleGitCheckout(repos []*components.Component, executor *GitExecutor, subArgs []string) {
 	if len(subArgs) == 0 {
 		fmt.Println("Error: branch name required")
 		fmt.Println("Usage: monhang git checkout <branch>")
@@ -730,7 +749,7 @@ func handleGitCheckout(repos []components.ComponentRef, executor *GitExecutor, s
 	operation := fmt.Sprintf("checkout %s", branch)
 	execFunc := func() {
 		runGitOperation(repos, *gitParallel,
-			func(ctx context.Context, repo components.ComponentRef, path string) {
+			func(ctx context.Context, repo *components.Component, path string) {
 				executor.ExecuteCheckout(ctx, repo.Name, path, branch)
 			})
 	}
@@ -738,7 +757,7 @@ func handleGitCheckout(repos []components.ComponentRef, executor *GitExecutor, s
 }
 
 // handleGitBranch handles the git branch subcommand.
-func handleGitBranch(repos []components.ComponentRef, executor *GitExecutor, subArgs []string) {
+func handleGitBranch(repos []*components.Component, executor *GitExecutor, subArgs []string) {
 	if len(subArgs) == 0 {
 		fmt.Println("Error: branch name required")
 		fmt.Println("Usage: monhang git branch <branch>")
@@ -748,7 +767,7 @@ func handleGitBranch(repos []components.ComponentRef, executor *GitExecutor, sub
 	operation := fmt.Sprintf("branch %s", branch)
 	execFunc := func() {
 		runGitOperation(repos, *gitParallel,
-			func(ctx context.Context, repo components.ComponentRef, path string) {
+			func(ctx context.Context, repo *components.Component, path string) {
 				executor.ExecuteBranch(ctx, repo.Name, path, branch)
 			})
 	}
@@ -774,21 +793,21 @@ func runGit(_ *Command, args []string) {
 		Msg("Starting git command")
 
 	// Try to parse configuration file
-	proj, err := components.ParseProjectFile(*gitF)
+	comp, err := components.ParseComponentFile(*gitF)
 	if err != nil {
 		// If config file doesn't exist, check if current directory is a git repo
 		if isGitRepository(".") {
 			logging.GetLogger("git").Debug().Msg("No config file found, using current directory as git repository")
-			// Create a minimal project with just the current directory
+			// Create a minimal component with just the current directory
 			// Use "." as the name so getRepos() will find it in the current directory
-			proj = components.CreateLocalProject(".")
+			comp = components.CreateLocalComponent(".")
 		} else {
 			// Not a git repo and no config file - fail
 			Check(err)
 		}
 	}
 
-	repos := getRepos(proj)
+	repos := getRepos(comp)
 
 	if len(repos) == 0 {
 		logging.GetLogger("git").Warn().Msg("No repositories found")
