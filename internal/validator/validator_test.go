@@ -118,11 +118,6 @@ func TestValidateJSON_Invalid(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name:          "missing required field name",
-			json:          `{"version": "1.0.0"}`,
-			expectedError: "missing property",
-		},
-		{
 			name:          "invalid source URL no scheme",
 			json:          `{"name": "test", "source": "github.com/org/repo"}`,
 			expectedError: "does not match pattern",
@@ -161,11 +156,6 @@ func TestValidateJSON_Invalid(t *testing.T) {
 			name:          "wrong type for components",
 			json:          `{"name": "test", "components": "not-an-array"}`,
 			expectedError: "want array",
-		},
-		{
-			name:          "nested component missing name",
-			json:          `{"name": "parent", "components": [{"source": "git://github.com/org/repo.git"}]}`,
-			expectedError: "missing property",
 		},
 	}
 
@@ -241,11 +231,6 @@ func TestValidateTOML_Invalid(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name:          "missing required field name",
-			toml:          `version = "1.0.0"`,
-			expectedError: "missing property",
-		},
-		{
 			name: "invalid source URL",
 			toml: `name = "test"
 source = "invalid-url"`,
@@ -284,11 +269,11 @@ func TestFormatValidationError(t *testing.T) {
 	}
 
 	// Test with validation error containing helpful messages
-	jsonData := []byte(`{"version": "1.0.0"}`) // missing name
+	jsonData := []byte(`{"name": "test", "version": "invalid"}`) // invalid version format
 	validationErr := ValidateJSON(jsonData)
 
 	if validationErr == nil {
-		t.Fatal("Expected validation error for missing name")
+		t.Fatal("Expected validation error for invalid version format")
 	}
 
 	errorMsg := validationErr.Error()

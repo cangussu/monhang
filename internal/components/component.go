@@ -41,7 +41,7 @@ const (
 //   - git@github.com:org/repo.git?version=v1.0.0
 type Component struct {
 	Source      string       `json:"source,omitempty" toml:"source,omitempty"`
-	Name        string       `json:"name" toml:"name"`
+	Name        string       `json:"name,omitempty" toml:"name,omitempty"`
 	Description string       `json:"description,omitempty" toml:"description,omitempty"`
 	Version     string       `json:"version,omitempty" toml:"version,omitempty"`
 	Components  []*Component `json:"components,omitempty" toml:"components,omitempty"`
@@ -161,6 +161,70 @@ func (comp *Component) GetType() string {
 
 	_, _, repoType := parseSourceURL(comp.Source)
 	return repoType
+}
+
+// deriveNameFromURL extracts the directory name from a git repository URL.
+// This mimics git's behavior when cloning without specifying a target directory.
+// Examples:
+//   - https://github.com/org/repo.git -> repo
+//   - /path/to/repo.git -> repo
+//   - git@host.xz:foo/.git -> foo
+//   - https://github.com/org/repo -> repo
+func deriveNameFromURL(repoURL string) string {
+	// Remove trailing slashes
+	repoURL = strings.TrimSuffix(repoURL, "/")
+
+	// Extract the last path component
+	var pathPart string
+
+	// Handle SSH format (git@host:path)
+	if strings.Contains(repoURL, "@") && strings.Contains(repoURL, ":") && !strings.Contains(repoURL, "://") {
+		// Split by ':' to get the path part after the colon
+		parts := strings.SplitN(repoURL, ":", 2)
+		if len(parts) == 2 {
+			pathPart = parts[1]
+		}
+	} else {
+		// Handle standard URLs and file paths
+		u, err := url.Parse(repoURL)
+		if err == nil && u.Path != "" {
+			pathPart = u.Path
+		} else {
+			// Fall back to simple path extraction
+			pathPart = repoURL
+		}
+	}
+
+	// Handle both forward and backslashes for cross-platform compatibility
+	pathPart = strings.ReplaceAll(pathPart, "\\", "/")
+
+	// Remove .git suffix from the path (could be directory or file)
+	pathPart = strings.TrimSuffix(pathPart, "/.git")
+	pathPart = strings.TrimSuffix(pathPart, ".git")
+
+	// Get the base name (last component)
+	lastComponent := filepath.Base(pathPart)
+
+	// If we ended up with an empty string or just ".", use a default
+	if lastComponent == "" || lastComponent == "." || lastComponent == "/" {
+		return "component"
+	}
+
+	return lastComponent
+}
+
+// GetName returns the component name, deriving it from the source URL if not specified.
+func (comp *Component) GetName() string {
+	if comp.Name != "" {
+		return comp.Name
+	}
+
+	if comp.Source != "" {
+		repoURL, _, _ := parseSourceURL(comp.Source)
+		return deriveNameFromURL(repoURL)
+	}
+
+	return "component"
 }
 
 // ParseComponentFile parses a component configuration file (JSON or TOML format).
