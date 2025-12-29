@@ -118,7 +118,7 @@ func FormatValidationError(err error) error {
 	if strings.Contains(errorMsg, "does not match pattern") {
 		switch {
 		case strings.Contains(errorMsg, "source"):
-			hints = append(hints, "Hint: Source URLs must start with git://, https://, file://, or ssh://")
+			hints = append(hints, "Hint: Source URLs must start with git://, https://, file://, ssh://, or use SSH format (git@host:path)")
 		case strings.Contains(errorMsg, "name"):
 			hints = append(hints, "Hint: Names can only contain letters, numbers, underscores, and hyphens")
 		case strings.Contains(errorMsg, "version"):
